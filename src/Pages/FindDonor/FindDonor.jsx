@@ -21,19 +21,19 @@ const FindDonor = () => {
             );
             const data = await response.json();
             const city = data.results?.[0]?.components?.city || data.results?.[0]?.components?.town;
-            setUserCity(city || "Faridabad"); // Set city or default to "Faridabad"
+            setUserCity(city || "Faridabad"); 
           } catch (error) {
             console.error("Error fetching geolocation data:", error);
-            setUserCity("Faridabad"); // Default to "Faridabad" on error
+            setUserCity("Faridabad"); 
           }
         },
         (error) => {
           console.error("Geolocation error:", error);
-          setUserCity("Faridabad"); // Default to "Faridabad" if geolocation fails
+          setUserCity("Faridabad"); 
         }
       );
     } else {
-      setUserCity("Faridabad"); // Default to "Faridabad" if geolocation is not supported
+      setUserCity("Faridabad"); 
     }
   }, []);
 
