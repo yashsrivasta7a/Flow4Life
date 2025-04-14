@@ -25,6 +25,8 @@ const ChatList = () => {
           ...chatData,
         }));
         setChats(chatList);
+      } else {
+        setChats([]); // Handle case where no chats exist
       }
       setLoading(false);
     });
@@ -48,7 +50,7 @@ const ChatList = () => {
               <div
                 key={chat.chatId}
                 className="p-4 bg-white shadow-md rounded-lg hover:shadow-lg transition cursor-pointer"
-                onClick={() => navigate(`/chat/${chat.chatId}`)}
+                onClick={() => navigate(`/chat/${chat.chatId.split("_").find(id => id !== auth.currentUser.uid)}`)}
               >
                 <h2 className="text-lg font-bold text-gray-800">
                   {chat.name || "Unknown User"}
