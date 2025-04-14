@@ -137,6 +137,12 @@ const UserProfile = () => {
             <FaComments className="mr-2" /> CHAT NOW
           </button>
           <button 
+            onClick={() => navigate(`/chat/${userId}`)}
+            className="w-full bg-red-500 text-white py-3 rounded-lg hover:bg-red-600 transition flex items-center justify-center"
+          >
+            <FaComments className="mr-2" /> CHAT WITH RECIPIENT
+          </button>
+          <button 
             onClick={handleCall}
             className="w-full bg-red-500 text-white py-3 rounded-lg hover:bg-red-600 transition flex items-center justify-center"
           >

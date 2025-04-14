@@ -1,15 +1,17 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { useCollectionData } from "react-firebase-hooks/firestore";
+import { useAuthState } from "react-firebase-hooks/auth"; // Ensure this import is correct
 import { auth } from "../../Utils/Firebase";
 import {
+  getDatabase,
+  ref,
+  push,
+  set,
+  onValue,
+  off,
+} from "firebase/database";
+import {
   getFirestore,
-  collection,
-  query,
-  orderBy,
-  addDoc,
-  serverTimestamp,
   doc,
   getDoc,
 } from "firebase/firestore";
@@ -20,17 +22,34 @@ const ChatWithUser = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
   const [user] = useAuthState(auth);
+  const db = getDatabase();
   const firestore = getFirestore();
 
   const [formValue, setFormValue] = useState("");
   const [chatUserName, setChatUserName] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(true);
   const [loadingUsername, setLoadingUsername] = useState(true);
   const dummy = useRef(null);
 
   const chatId = getChatId(user?.uid, userId);
-  const messagesRef = collection(firestore, `chats/${chatId}/messages`);
-  const messagesQuery = query(messagesRef, orderBy("createdAt", "asc"));
-  const [messages, loadingMessages] = useCollectionData(messagesQuery, { idField: "id" });
+
+  useEffect(() => {
+    if (!user) return;
+
+    const messagesRef = ref(db, `chats/${chatId}`);
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
+      const data = snapshot.val();
+      const loadedMessages = data
+        ? Object.entries(data).map(([id, val]) => ({ id, ...val }))
+        : [];
+      setMessages(loadedMessages);
+      setLoadingMessages(false);
+      dummy.current?.scrollIntoView({ behavior: "smooth" });
+    });
+
+    return () => off(messagesRef); // Cleanup listener
+  }, [user, chatId]);
 
   useEffect(() => {
     const fetchChatUserName = async () => {
@@ -51,12 +70,32 @@ const ChatWithUser = () => {
     if (!formValue.trim() || !user) return;
 
     const { uid, photoURL } = user;
+    const messagesRef = ref(db, `chats/${chatId}`);
+    const newMsgRef = push(messagesRef);
 
-    await addDoc(messagesRef, {
+    const messageData = {
       text: formValue.trim(),
-      createdAt: serverTimestamp(),
       uid,
       photoURL: photoURL || "",
+      createdAt: new Date().toISOString(),
+    };
+
+    await set(newMsgRef, messageData);
+
+    // Update userChats for both participants
+    const userChatsRef = ref(db, `userChats/${uid}/${chatId}`);
+    const recipientChatsRef = ref(db, `userChats/${userId}/${chatId}`);
+    const chatSummary = {
+      name: chatUserName,
+      lastMessage: messageData.text,
+      timestamp: messageData.createdAt,
+    };
+
+    await set(userChatsRef, chatSummary);
+    await set(recipientChatsRef, {
+      name: user.displayName || "You",
+      lastMessage: messageData.text,
+      timestamp: messageData.createdAt,
     });
 
     setFormValue("");
@@ -95,7 +134,7 @@ const ChatWithUser = () => {
           </div>
         ) : (
           <>
-            {messages?.map((msg) => (
+            {messages.map((msg) => (
               <ChatMessage key={msg.id} message={msg} currentUserId={user.uid} />
             ))}
             <span ref={dummy} />

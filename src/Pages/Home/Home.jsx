@@ -248,6 +248,12 @@ const Home = () => {
               >
                 Request Blood <ArrowRight className="w-5 h-5" />
               </button>
+              <button
+                onClick={() => navigate("/chats")}
+                className="bg-blue-500 text-white px-8 py-3 rounded-full hover:bg-blue-600 transition-colors shadow-sm hover:shadow flex items-center gap-2"
+              >
+                View Chats <MessageCircle className="w-5 h-5" />
+              </button>
             </motion.div>
           </div>
 
