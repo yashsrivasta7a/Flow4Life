@@ -8,6 +8,7 @@ import FindDonor from './Pages/FindDonor/FindDonor';
 import BloodDonationForm from './Pages/Donationform/Blooddonationform';
 import UserProfile from './Pages/UserProfile/UserProfile';
 import ProfileSetup from './Pages/ProfileSetup/ProfileSetup';
+import ChatWithUser from './Pages/ChatWithUser/ChatWithUser';
 
 function App() 
 {   
@@ -32,6 +33,7 @@ function App()
           <Route path="/profile/:userId" element={<UserProfile />} />  
           <Route path="/donate" element={<BloodDonationForm />} />
           <Route path="/profilesetup" element={<ProfileSetup />} />
+          <Route path="/chat/:userId" element={<ChatWithUser />} />
           <Route path="/" element={<Home />} />
         </Routes>
       </Router>
