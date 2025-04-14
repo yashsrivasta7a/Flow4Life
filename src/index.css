@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+*{
+  padding: 2px;
+}
+
 /* Custom styles can be added here if needed */
 .custom-scrollbar::-webkit-scrollbar {
     width: 8px;

@@ -5,7 +5,7 @@ import { getMessaging, onMessage, getToken } from 'firebase/messaging';
 import { app } from "../../Utils/Firebase";
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Bell, Droplet, MapPin, Users, Heart, ArrowRight, ChevronRight, MessageCircle } from "lucide-react";
+import { Menu, X, Bell, Droplet, MapPin, Users, Heart, ArrowRight, ChevronRight, MessageCircle, Heading1 } from "lucide-react";
 import blood from '../../assets/blood.png'
 import { toast } from "react-hot-toast";
 
@@ -21,6 +21,7 @@ const Home = () => {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notificationToken, setNotificationToken] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -47,7 +48,7 @@ const Home = () => {
 
   useEffect(() => {
     onMessage(messaging, (payload) => {
-      console.log('Message received in foreground: ', payload);
+      console.log('Message received in foreground: ', payload)
       setNotifications((prev) => [...prev, payload.notification]);
       toast.success(payload.notification?.title || "New notification");
     });
@@ -59,8 +60,10 @@ const Home = () => {
       const userId = auth.currentUser?.uid;
       if (token && userId) {
         await set(ref(database, `users/${userId}/fcmToken`), token);
+        setNotificationToken(token); // Save token to state
       }
       console.log('Notification token:', token);
+
     } catch (error) {
       console.error('Error getting notification token:', error);
     }
@@ -80,6 +83,7 @@ const Home = () => {
   return (
     <>
       <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
+     
         {/* Navigation */}
         <motion.nav
           className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm shadow-sm border-b border-gray-100"
@@ -324,6 +328,7 @@ const Home = () => {
             Register as Donor
           </Link>
         </div>
+
       </div>
     </>
   );
