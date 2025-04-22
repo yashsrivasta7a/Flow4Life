@@ -9,6 +9,7 @@ import BloodDonationForm from './Pages/Donationform/Blooddonationform';
 import UserProfile from './Pages/UserProfile/UserProfile';
 import ProfileSetup from './Pages/ProfileSetup/ProfileSetup';
 import Chat from './components/Chat';
+import NotificationCenter from './components/NotificationCenter';
 import ChatWithUser from './Pages/ChatWithUser/ChatWithUser';
 import ChatList from './Pages/ChatList/ChatList';
 
@@ -27,6 +28,7 @@ function App()
   }
     return ( 
       <Router>
+        <NotificationCenter/>
         <Routes>
           <Route path="/signup" element={<Signuppage />} />
           <Route path="/signin" element={<Signinpage />} />

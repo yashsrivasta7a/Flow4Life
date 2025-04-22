@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { getAuth } from 'firebase/auth';
-import { getDatabase, ref, onValue, push, set, query, orderByChild, equalTo } from 'firebase/database';
+import { getDatabase, ref, onValue, push, set, query, orderByChild, equalTo, get } from 'firebase/database';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from "framer-motion";
 import { ChevronLeft, Send, User, MessageCircle } from "lucide-react";
 import { app } from '../Utils/Firebase';
 import { toast } from "react-hot-toast";
+import { sendChatNotification } from '../Utils/Notifications'; // Import the notification function
 
 const Chat = () => {
   const navigate = useNavigate();
@@ -88,6 +89,13 @@ const Chat = () => {
           ...chatData
         });
         toast.success("Chat started successfully");
+        
+        // Send notification to the donor that a new chat has been initiated
+        sendChatNotification(
+          donorId,
+          "A new chat has been started with you",
+          auth.currentUser.displayName || auth.currentUser.email.split('@')[0]
+        );
       })
       .catch((error) => {
         toast.error("Failed to start chat");
@@ -130,6 +138,16 @@ const Chat = () => {
 
     // Update the last message in the chat
     set(ref(database, `chats/${selectedChat.id}/lastMessage`), messageData);
+    
+    // Send notification to the other participant
+    const otherParticipantId = selectedChat.participants.find(id => id !== auth.currentUser.uid);
+    if (otherParticipantId) {
+      sendChatNotification(
+        otherParticipantId, 
+        newMessage, 
+        auth.currentUser.displayName || auth.currentUser.email.split('@')[0]
+      );
+    }
 
     setNewMessage('');
   };
