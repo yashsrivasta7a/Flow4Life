@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import blood from "../../assets/blood.png";
 import "../signin/Signinpage.css";
+import Navbar from '../../components/Navbar';
 
 const ProfileSetup = () => {
     const auth = getAuth();
@@ -15,7 +16,9 @@ const ProfileSetup = () => {
     const [bloodGroup, setBloodGroup] = useState("");
     const [location, setLocation] = useState("");
     const [contact, setContact] = useState("");
-
+    const [notifications, setNotifications] = useState([]);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [menuOpen, setMenuOpen] = useState(false);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -48,60 +51,56 @@ const ProfileSetup = () => {
     };
 
     return (
-        <div className='page-container'>
-            <div className="form-container">
-                <div className="header">
-                    <h1 className='app-name'>Flow4Life</h1>
-                    <div className='header'>
-                        <img src={blood} alt="Blood Donation Logo" />
+        <>
+            <Navbar
+                user={user}
+                onLogout={() => {}}
+                notifications={notifications}
+                showNotifications={showNotifications}
+                setShowNotifications={setShowNotifications}
+                menuOpen={menuOpen}
+                setMenuOpen={setMenuOpen}
+            />
+            <div className='page-container'>
+                <div className="form-container">
+                    <div className="header">
+                        <h1 className='app-name'>Flow4Life</h1>
+                        <div className='header'>
+                            <img src={blood} alt="Blood Donation Logo" />
+                        </div>
+                        <h2 className='form-title'>Profile Setup</h2>
                     </div>
-                    <h2 className='form-title'>Profile Setup</h2>
+                    <form onSubmit={handleSubmit}>
+                        <div className="form-group">
+                            <input
+                                type="text"
+                                placeholder='BloodGroup'
+                                value={bloodGroup}
+                                onChange={(e) => setBloodGroup(e.target.value)}
+                                required
+                            />
+                            <input
+                                type="text"
+                                placeholder="Location"
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value)}
+                                required
+                            />
+                            <input
+                                type="text"
+                                placeholder="Contact"
+                                value={contact}
+                                onChange={(e) => setContact(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <button type='submit' className='submitbutton'>
+                            Complete Your Profile
+                        </button>
+                    </form>
                 </div>
-                <form onSubmit={handleSubmit}>
-                    <div className="form-group">
-
-
-                        <input
-                            type="text"
-                            placeholder='BloodGroup'
-                            // className={`input-field ${errorEmail ? 'border-red-500 bg-red-100' : 'border-white-500 bg-white-100'}`}
-                            value={bloodGroup}
-                            onChange={(e) => setBloodGroup(e.target.value)}
-                            required
-                        />
-                        {/* <p className='text-red-500 text-sm text-left pl-1'>{errorEmail}</p> */}
-
-                        <input
-                            type="text"
-                            placeholder="Location"
-                            value={location}
-                            onChange={(e) => setLocation(e.target.value)}
-                            required
-                        />
-                        <input
-                            type="text"
-                            placeholder="Contact"
-                            value={contact}
-                            onChange={(e) => setContact(e.target.value)}
-                            required
-                        />
-                        {/* <p className='text-red-500 text-sm text-left pl-1'>{errorPassword}</p> */}
-
-
-                    </div>
-                    {/* <div className="form-options">
-                        <label>
-                            <input type="checkbox" className='checkbox' />Remember me
-                        </label>
-                        <a href="#" className='forgot'>Forgot Password?</a>
-                    </div> */}
-                    <button type='submit' className='submitbutton'
-
-                    >Complete Your Profile</button>
-                </form>
-
             </div>
-        </div>
+        </>
     );
 };
 export default ProfileSetup;

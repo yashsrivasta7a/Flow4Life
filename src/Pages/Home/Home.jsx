@@ -5,9 +5,10 @@ import { getMessaging, onMessage, getToken } from 'firebase/messaging';
 import { app } from "../../Utils/Firebase";
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Bell, Droplet, MapPin, Users, Heart, ArrowRight, ChevronRight, MessageCircle, Heading1 } from "lucide-react";
+import { Bell, Droplet, MapPin, Users, Heart, ArrowRight, ChevronRight, MessageCircle, Heading1 } from "lucide-react";
 import blood from '../../assets/blood.png'
 import { toast } from "react-hot-toast";
+import Navbar from '../../components/Navbar';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ const Home = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationToken, setNotificationToken] = useState(null);
+  const [showScroll, setShowScroll] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -40,7 +42,7 @@ const Home = () => {
     onValue(donationRequestsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        setDonationRequests(Object.values(data));
+        setDonationRequests(Object.values(data)); // No city filter, show all
       }
       setLoading(false);
     });
@@ -53,6 +55,14 @@ const Home = () => {
       toast.success(payload.notification?.title || "New notification");
     });
   }, [messaging]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScroll(window.scrollY > 300);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const requestNotificationPermission = async () => {
     try {
@@ -74,6 +84,10 @@ const Home = () => {
     navigate('/signin');
   };
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // const stats = [
   //   { icon: <Droplet className="w-8 h-8 text-red-500" />, value: "1,000+", label: "Blood Donations" },
   //   { icon: <Users className="w-8 h-8 text-red-500" />, value: "5,000+", label: "Active Donors" },
@@ -82,134 +96,16 @@ const Home = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
-     
-        {/* Navigation */}
-        <motion.nav
-          className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm shadow-sm border-b border-gray-100"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <Link to="/" className="flex items-center gap-3">
-                <motion.img
-                  src={blood}
-                  alt="Flow4Life"
-                  className="h-10"
-                  whileHover={{ rotate: 10, scale: 1.1 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                />
-                <span className="text-2xl font-bold bg-gradient-to-r from-red-600 to-red-400 bg-clip-text text-transparent">
-                  Flow4Life
-                </span>
-              </Link>
-
-              {/* Desktop Navigation */}
-              <div className="hidden md:flex items-center gap-8">
-                <Link to="/" className="text-gray-700 hover:text-red-500 transition-colors">Home</Link>
-                <Link to="/finddonor" className="text-gray-700 hover:text-red-500 transition-colors">Find Donors</Link>
-                <Link to="/requestform" className="text-gray-700 hover:text-red-500 transition-colors">Request Blood</Link>
-
-                {/* Notifications */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="p-2 rounded-full hover:bg-gray-100 relative"
-                  >
-                    <Bell className="w-5 h-5" />
-                    {notifications.length > 0 && (
-                      <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-                        {notifications.length}
-                      </span>
-                    )}
-                  </button>
-
-                  <AnimatePresence>
-                    {showNotifications && (
-                      <motion.div
-                        className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl py-2 border border-gray-100"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                      >
-                        <div className="px-4 py-2 border-b border-gray-100">
-                          <h3 className="font-semibold text-gray-900">Notifications</h3>
-                        </div>
-                        {notifications.length > 0 ? (
-                          notifications.map((notification, index) => (
-                            <div key={index} className="px-4 py-3 hover:bg-gray-50">
-                              <p className="font-medium text-gray-900">{notification.title}</p>
-                              <p className="text-sm text-gray-600">{notification.body}</p>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="px-4 py-3 text-gray-500 text-sm">No new notifications</p>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {user ? (
-                  <button
-                    onClick={handleLogout}
-                    className="bg-red-500 text-white px-6 py-2 rounded-full hover:bg-red-600 transition-colors shadow-sm hover:shadow"
-                  >
-                    Sign Out
-                  </button>
-                ) : (
-                  <Link
-                    to="/signin"
-                    className="bg-red-500 text-white px-6 py-2 rounded-full hover:bg-red-600 transition-colors shadow-sm hover:shadow"
-                  >
-                    Sign In
-                  </Link>
-                )}
-              </div>
-
-              {/* Mobile menu button */}
-              <button className="md:hidden" onClick={() => setMenuOpen(!menuOpen)}>
-                {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile menu */}
-          <AnimatePresence>
-            {menuOpen && (
-              <motion.div
-                className="md:hidden"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-              >
-                <div className="px-4 pt-2 pb-3 space-y-1 bg-white border-t border-gray-100">
-                  <Link to="/" className="block px-3 py-2 text-gray-700 hover:bg-red-50 rounded-md">Home</Link>
-                  <Link to="/finddonor" className="block px-3 py-2 text-gray-700 hover:bg-red-50 rounded-md">Find Donors</Link>
-                  <Link to="/requestform" className="block px-3 py-2 text-gray-700 hover:bg-red-50 rounded-md">Request Blood</Link>
-                  {user ? (
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left px-3 py-2 text-gray-700 hover:bg-red-50 rounded-md"
-                    >
-                      Sign Out
-                    </button>
-                  ) : (
-                    <Link
-                      to="/signin"
-                      className="block px-3 py-2 text-gray-700 hover:bg-red-50 rounded-md"
-                    >
-                      Sign In
-                    </Link>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.nav>
-
+      <Navbar
+        user={user}
+        onLogout={handleLogout}
+        notifications={notifications}
+        showNotifications={showNotifications}
+        setShowNotifications={setShowNotifications}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+      />
+      <div className="min-h-screen bg-gradient-to-b from-background to-surface">
         {/* Hero Section */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center">
@@ -275,9 +171,9 @@ const Home = () => {
         </div>
 
         {/* Donation Requests Section */}
-        <div className="mt-16">
+        <div className="mt-16 mx-9">
           <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-900">Available Blood Donators</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Available Blood Donors</h2>
             <Link
               to="/finddonor"
               className="text-red-500 hover:text-red-600 flex items-center gap-1"
@@ -336,6 +232,29 @@ const Home = () => {
         </div>
 
       </div>
+      {/* Footer */}
+      <footer className="bg-surface border-t border-accent py-6 mt-16 text-center text-primary text-sm">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-2 px-4">
+          <div>
+            &copy; {new Date().getFullYear()} Flow4Life. All rights reserved.
+          </div>
+          <div className="flex gap-4">
+            <a href="mailto:support@flow4life.com" className="hover:text-accent transition">Contact</a>
+            <a href="/" className="hover:text-accent transition">Dashboard</a>
+            <a href="/finddonor" className="hover:text-accent transition">Find Donors</a>
+          </div>
+        </div>
+      </footer>
+      {/* Scroll to Top Button */}
+      {showScroll && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 bg-primary text-white p-3 rounded-full shadow-lg hover:bg-accent transition z-50"
+          aria-label="Scroll to top"
+        >
+          ↑
+        </button>
+      )}
     </>
   );
 };

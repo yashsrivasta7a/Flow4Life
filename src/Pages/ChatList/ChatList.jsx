@@ -2,11 +2,16 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getDatabase, ref, onValue } from "firebase/database";
 import { auth } from "../../Utils/Firebase";
+import Navbar from '../../components/Navbar';
 
 const ChatList = () => {
   const navigate = useNavigate();
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -41,29 +46,40 @@ const ChatList = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Your Chats</h1>
-        {chats.length > 0 ? (
-          <div className="space-y-4">
-            {chats.map((chat) => (
-              <div
-                key={chat.chatId}
-                className="p-4 bg-white shadow-md rounded-lg hover:shadow-lg transition cursor-pointer"
-                onClick={() => navigate(`/chat/${chat.chatId.split("_").find(id => id !== auth.currentUser.uid)}`)}
-              >
-                <h2 className="text-lg font-bold text-gray-800">
-                  {chat.name || "Unknown User"}
-                </h2>
-                <p className="text-gray-600">{chat.lastMessage || "No messages yet"}</p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-600">You have no chats yet.</p>
-        )}
+    <>
+      <Navbar
+        user={user}
+        onLogout={() => {}}
+        notifications={notifications}
+        showNotifications={showNotifications}
+        setShowNotifications={setShowNotifications}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+      />
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-2xl font-bold text-gray-800 mb-6">Your Chats</h1>
+          {chats.length > 0 ? (
+            <div className="space-y-4">
+              {chats.map((chat) => (
+                <div
+                  key={chat.chatId}
+                  className="p-4 bg-white shadow-md rounded-lg hover:shadow-lg transition cursor-pointer"
+                  onClick={() => navigate(`/chat/${chat.chatId.split("_").find(id => id !== auth.currentUser.uid)}`)}
+                >
+                  <h2 className="text-lg font-bold text-gray-800">
+                    {chat.name || "Unknown User"}
+                  </h2>
+                  <p className="text-gray-600">{chat.lastMessage || "No messages yet"}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-600">You have no chats yet.</p>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

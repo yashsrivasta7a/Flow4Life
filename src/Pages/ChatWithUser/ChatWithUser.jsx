@@ -15,6 +15,7 @@ import {
   doc,
   getDoc,
 } from "firebase/firestore";
+import Navbar from '../../components/Navbar';
 
 const getChatId = (id1, id2) => [id1, id2].sort().join("_");
 
@@ -31,6 +32,9 @@ const ChatWithUser = () => {
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [loadingUsername, setLoadingUsername] = useState(true);
   const dummy = useRef(null);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const chatId = getChatId(user?.uid, userId);
 
@@ -111,57 +115,68 @@ const ChatWithUser = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-red-500 text-white p-4 flex items-center justify-between">
-        <button
-          onClick={() => navigate(-1)}
-          className="bg-white text-red-500 px-4 py-2 rounded-lg hover:bg-gray-200 transition"
-        >
-          Back
-        </button>
-        <h1 className="text-lg font-bold truncate">
-          {loadingUsername ? "Loading..." : chatUserName}
-        </h1>
-        <div className="w-16" />
-      </header>
+    <>
+      <Navbar
+        user={user}
+        onLogout={() => {}}
+        notifications={notifications}
+        showNotifications={showNotifications}
+        setShowNotifications={setShowNotifications}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+      />
+      <div className="flex flex-col h-screen bg-gray-100">
+        {/* Header */}
+        <header className="bg-red-500 text-white p-4 flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="bg-white text-red-500 px-4 py-2 rounded-lg hover:bg-gray-200 transition"
+          >
+            Back
+          </button>
+          <h1 className="text-lg font-bold truncate">
+            {loadingUsername ? "Loading..." : chatUserName}
+          </h1>
+          <div className="w-16" />
+        </header>
 
-      {/* Messages */}
-      <main className="flex-1 overflow-y-auto p-4">
-        {loadingMessages ? (
-          <div className="flex justify-center items-center h-full">
-            <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 animate-spin border-red-500"></div>
-          </div>
-        ) : (
-          <>
-            {messages.map((msg) => (
-              <ChatMessage key={msg.id} message={msg} currentUserId={user.uid} />
-            ))}
-            <span ref={dummy} />
-          </>
-        )}
-      </main>
+        {/* Messages */}
+        <main className="flex-1 overflow-y-auto p-4">
+          {loadingMessages ? (
+            <div className="flex justify-center items-center h-full">
+              <div className="loader ease-linear rounded-full border-4 border-t-4 border-red-500 h-12 w-12 animate-spin"></div>
+            </div>
+          ) : (
+            <>
+              {messages.map((msg) => (
+                <ChatMessage key={msg.id} message={msg} currentUserId={user.uid} />
+              ))}
+              <span ref={dummy} />
+            </>
+          )}
+        </main>
 
-      {/* Input */}
-      <form
-        onSubmit={sendMessage}
-        className="flex items-center p-4 bg-white border-t border-gray-300"
-      >
-        <input
-          type="text"
-          value={formValue}
-          onChange={(e) => setFormValue(e.target.value)}
-          placeholder="Type your message..."
-          className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-        />
-        <button
-          type="submit"
-          className="ml-2 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+        {/* Input */}
+        <form
+          onSubmit={sendMessage}
+          className="flex items-center p-4 bg-white border-t border-gray-300"
         >
-          Send
-        </button>
-      </form>
-    </div>
+          <input
+            type="text"
+            value={formValue}
+            onChange={(e) => setFormValue(e.target.value)}
+            placeholder="Type your message..."
+            className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+          />
+          <button
+            type="submit"
+            className="ml-2 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+          >
+            Send
+          </button>
+        </form>
+      </div>
+    </>
   );
 };
 
