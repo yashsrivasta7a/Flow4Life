@@ -4,15 +4,15 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
-  background: #F6F8FA;
+  min-height: 95vh;
+  background: #dda8a1;
   font-family: 'Poppins';
-  padding: 1rem;
+  padding: 1.7rem;
   overflow-y: auto;
 }
 
 .form-container {
-  background-color: #ffffff;
+  background-color: #f7e2e2;
   border-radius: 20px;
   box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2);
   padding: 1.5rem;

@@ -5,6 +5,7 @@ import { getAuth, signInWithPopup, signInWithEmailAndPassword, GoogleAuthProvide
 import { getDatabase, ref, get, set } from "firebase/database";
 import { app } from "../../Utils/Firebase";
 import "./Signinpage.css";
+import Navbar from '../../components/Navbar';
 
 const Signinpage = () => {
   const navigate = useNavigate();
@@ -16,6 +17,10 @@ const Signinpage = () => {
   const [password, setPassword] = useState('');
   const [errorEmail, setErrorEmail] = useState('');
   const [errorPassword, setErrorPassword] = useState('');
+  const [user, setUser] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Function to check if the user's profile is complete
   const checkUserProfile = async (user) => {
@@ -72,51 +77,62 @@ const Signinpage = () => {
   };
 
   return (
-    <div className='page-container'>
-      <div className="form-container">
-        <div className="header">
-          <h1 className='app-name'>Flow4Life</h1>
-          <div className='header'>
-            <img src={blood} alt="Blood Donation Logo" />
+    <>
+      <Navbar
+        user={user}
+        onLogout={() => {}}
+        notifications={notifications}
+        showNotifications={showNotifications}
+        setShowNotifications={setShowNotifications}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+      />
+      <div className='page-container'>
+        <div className="form-container">
+          <div className="header">
+            <h1 className='app-name'>Flow4Life</h1>
+            <div className='header'>
+              <img src={blood} alt="Blood Donation Logo" />
+            </div>
+            <h2 className='form-title'>Sign In</h2>
           </div>
-          <h2 className='form-title'>Sign In</h2>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <input
+                type="email"
+                placeholder='Email'
+                className={`input-field ${errorEmail ? 'border-red-500 bg-red-100' : 'border-white-500 bg-white-100'}`}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <p className='text-red-500 text-sm text-left pl-1'>{errorEmail}</p>
+
+              <input
+                type="password"
+                placeholder='Password'
+                className={`input-field ${errorPassword ? 'border-red-500 bg-red-100' : 'border-white-500 bg-white-100'}`}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <p className='text-red-500 text-sm text-left pl-1'>{errorPassword}</p>
+            </div>
+
+            <div className="form-options">
+              <label>
+                <input type="checkbox" className='checkbox' />Remember me
+              </label>
+              <a href="#" className='forgot'>Forgot Password?</a>
+            </div>
+            <button type='submit' className='submitbutton'>Login</button>
+          </form>
+          <button className='submitbutton2' onClick={signupWithGoogle}>Sign in with Google</button>
+          <p className='footer-text'>
+            Don’t Have an account?{" "}
+            <Link to="/signup">Sign Up</Link>
+          </p>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <input
-              type="email"
-              placeholder='Email'
-              className={`input-field ${errorEmail ? 'border-red-500 bg-red-100' : 'border-white-500 bg-white-100'}`}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <p className='text-red-500 text-sm text-left pl-1'>{errorEmail}</p>
-
-            <input
-              type="password"
-              placeholder='Password'
-              className={`input-field ${errorPassword ? 'border-red-500 bg-red-100' : 'border-white-500 bg-white-100'}`}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <p className='text-red-500 text-sm text-left pl-1'>{errorPassword}</p>
-          </div>
-
-          <div className="form-options">
-            <label>
-              <input type="checkbox" className='checkbox' />Remember me
-            </label>
-            <a href="#" className='forgot'>Forgot Password?</a>
-          </div>
-          <button type='submit' className='submitbutton'>Login</button>
-        </form>
-        <button className='submitbutton2' onClick={signupWithGoogle}>Sign in with Google</button>
-        <p className='footer-text'>
-          Don’t Have an account?{" "}
-          <Link to="/signup">Sign Up</Link>
-        </p>
       </div>
-    </div>
+    </>
   );
 };
 

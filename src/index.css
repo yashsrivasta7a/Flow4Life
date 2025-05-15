@@ -2,8 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-*{
-  padding: 2px;
+/* Remove global padding from all elements to fix extra white space */
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 /* Custom styles can be added here if needed */
@@ -24,4 +27,3 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #ff0808; 
   }
-  

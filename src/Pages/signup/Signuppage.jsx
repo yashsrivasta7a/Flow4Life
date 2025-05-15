@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { getAuth, signInWithPopup, createUserWithEmailAndPassword, GoogleAuthProvider } from "firebase/auth";
 import { app } from "../../Utils/Firebase";
 import "./Signuppage.css";
+import Navbar from '../../components/Navbar';
 
 const Signuppage = () => {
   const navigate = useNavigate();
@@ -19,6 +20,11 @@ const Signuppage = () => {
   const [errorEmail, setErrorEmail] = useState('');
   const [errorPassword, setErrorPassword] = useState('');
   const [errorConfirmPassword, setErrorConfirmPassword] = useState('');
+
+  const [user, setUser] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Validation functions
   const validateUsername = (value) => {
@@ -95,68 +101,79 @@ const Signuppage = () => {
     };
 
   return (
-    <div className='page-container'>
-      <div className="form-container">
-        <div className="header">
-          <h1 className='app-name'>Flow4Life</h1>
-          <div className='header'>
-            <img src={blood} alt="Blood Donation Logo" />
+    <>
+      <Navbar
+        user={user}
+        onLogout={() => {}}
+        notifications={notifications}
+        showNotifications={showNotifications}
+        setShowNotifications={setShowNotifications}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+      />
+      <div className='page-container'>
+        <div className="form-container">
+          <div className="header">
+            <h1 className='app-name'>Flow4Life</h1>
+            <div className='header'>
+              <img src={blood} alt="Blood Donation Logo" />
+            </div>
+            <h2 className='form-title'>Sign Up</h2>
           </div>
-          <h2 className='form-title'>Sign Up</h2>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <input
+                type="text"
+                placeholder='User name'
+                className={`input-field ${errorUsername ? 'border-red-500 bg-red-100' : 'border-white-500 bg-white-100'}`}
+                value={username}
+                onChange={handleInputChange(setUsername, validateUsername)}
+              />
+              <p className='text-red-500 text-sm text-left pl-1'>{errorUsername}</p>
+
+              <input
+                type="text"
+                placeholder='Email'
+                className={`input-field ${errorEmail ? 'border-red-500 bg-red-100' : 'border-white-500 bg-white-100'}`}
+                value={email}
+                onChange={handleInputChange(setEmail, validateEmail)}
+              />
+              <p className='text-red-500 text-sm text-left pl-1'>{errorEmail}</p>
+
+              <input
+                type="password"
+                placeholder='Password'
+                className={`input-field ${errorPassword ? 'border-red-500 bg-red-100' :'border-white-500 bg-white-100'}`}
+                value={password}
+                onChange={handleInputChange(setPassword, validatePassword)}
+              />
+              <p className='text-red-500 text-sm text-left pl-1'>{errorPassword}</p>
+
+              <input
+                type="password"
+                placeholder='Confirm password'
+                className={`input-field ${errorConfirmPassword ? 'border-red-500 bg-red-100' : 'border-white-500 bg-white-100'}`}
+                value={confirmPassword}
+                onChange={handleInputChange(setConfirmPassword, validateConfirmPassword)}
+              />
+              <p className='text-red-500 text-sm text-left pl-1'>{errorConfirmPassword}</p>
+            </div>
+            <div className="form-options">
+              <label>
+                <input type="checkbox" className='checkbox' />Remember me
+              </label>
+              
+            </div>
+            <button type='submit' className='submitbutton'>Create account</button>
+          </form>
+          <button className='submitbutton2' onClick={signupWithGoogle}>Sign in with Google</button>
+          <p className='footer-text'>
+            Already Have an account?{" "}
+            <Link to="/signin">Sign In</Link> {/* Navigate to sign-in page */}
+          </p>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <input
-              type="text"
-              placeholder='User name'
-              className={`input-field ${errorUsername ? 'border-red-500 bg-red-100' : 'border-white-500 bg-white-100'}`}
-              value={username}
-              onChange={handleInputChange(setUsername, validateUsername)}
-            />
-            <p className='text-red-500 text-sm text-left pl-1'>{errorUsername}</p>
-
-            <input
-              type="text"
-              placeholder='Email'
-              className={`input-field ${errorEmail ? 'border-red-500 bg-red-100' : 'border-white-500 bg-white-100'}`}
-              value={email}
-              onChange={handleInputChange(setEmail, validateEmail)}
-            />
-            <p className='text-red-500 text-sm text-left pl-1'>{errorEmail}</p>
-
-            <input
-              type="password"
-              placeholder='Password'
-              className={`input-field ${errorPassword ? 'border-red-500 bg-red-100' :'border-white-500 bg-white-100'}`}
-              value={password}
-              onChange={handleInputChange(setPassword, validatePassword)}
-            />
-            <p className='text-red-500 text-sm text-left pl-1'>{errorPassword}</p>
-
-            <input
-              type="password"
-              placeholder='Confirm password'
-              className={`input-field ${errorConfirmPassword ? 'border-red-500 bg-red-100' : 'border-white-500 bg-white-100'}`}
-              value={confirmPassword}
-              onChange={handleInputChange(setConfirmPassword, validateConfirmPassword)}
-            />
-            <p className='text-red-500 text-sm text-left pl-1'>{errorConfirmPassword}</p>
-          </div>
-          <div className="form-options">
-            <label>
-              <input type="checkbox" className='checkbox' />Remember me
-            </label>
-            
-          </div>
-          <button type='submit' className='submitbutton'>Create account</button>
-        </form>
-        <button className='submitbutton2' onClick={signupWithGoogle}>Sign in with Google</button>
-        <p className='footer-text'>
-          Already Have an account?{" "}
-          <Link to="/signin">Sign In</Link> {/* Navigate to sign-in page */}
-        </p>
       </div>
-    </div>
+    </>
   );
 };
 

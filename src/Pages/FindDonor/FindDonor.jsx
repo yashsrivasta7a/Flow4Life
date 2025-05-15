@@ -119,7 +119,7 @@ const FindDonor = () => {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            navigate(`/chat/${request.id}`);
+            navigate(`/chat/${request.userId}`);
           }}
           className="mt-2 bg-red-600 text-white px-4 py-2 rounded-md"
         >

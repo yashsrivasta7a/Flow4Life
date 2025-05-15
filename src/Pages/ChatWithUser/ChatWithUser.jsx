@@ -1,18 +1,21 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { useCollectionData } from "react-firebase-hooks/firestore";
+import { useAuthState } from "react-firebase-hooks/auth"; // Ensure this import is correct
 import { auth } from "../../Utils/Firebase";
 import {
+  getDatabase,
+  ref,
+  push,
+  set,
+  onValue,
+  off,
+} from "firebase/database";
+import {
   getFirestore,
-  collection,
-  query,
-  orderBy,
-  addDoc,
-  serverTimestamp,
   doc,
   getDoc,
 } from "firebase/firestore";
+import Navbar from '../../components/Navbar';
 
 const getChatId = (id1, id2) => [id1, id2].sort().join("_");
 
@@ -20,17 +23,37 @@ const ChatWithUser = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
   const [user] = useAuthState(auth);
+  const db = getDatabase();
   const firestore = getFirestore();
 
   const [formValue, setFormValue] = useState("");
   const [chatUserName, setChatUserName] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(true);
   const [loadingUsername, setLoadingUsername] = useState(true);
   const dummy = useRef(null);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const chatId = getChatId(user?.uid, userId);
-  const messagesRef = collection(firestore, `chats/${chatId}/messages`);
-  const messagesQuery = query(messagesRef, orderBy("createdAt", "asc"));
-  const [messages, loadingMessages] = useCollectionData(messagesQuery, { idField: "id" });
+
+  useEffect(() => {
+    if (!user) return;
+
+    const messagesRef = ref(db, `chats/${chatId}`);
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
+      const data = snapshot.val();
+      const loadedMessages = data
+        ? Object.entries(data).map(([id, val]) => ({ id, ...val }))
+        : [];
+      setMessages(loadedMessages);
+      setLoadingMessages(false);
+      dummy.current?.scrollIntoView({ behavior: "smooth" });
+    });
+
+    return () => off(messagesRef); // Cleanup listener
+  }, [user, chatId]);
 
   useEffect(() => {
     const fetchChatUserName = async () => {
@@ -51,12 +74,32 @@ const ChatWithUser = () => {
     if (!formValue.trim() || !user) return;
 
     const { uid, photoURL } = user;
+    const messagesRef = ref(db, `chats/${chatId}`);
+    const newMsgRef = push(messagesRef);
 
-    await addDoc(messagesRef, {
+    const messageData = {
       text: formValue.trim(),
-      createdAt: serverTimestamp(),
       uid,
       photoURL: photoURL || "",
+      createdAt: new Date().toISOString(),
+    };
+
+    await set(newMsgRef, messageData);
+
+    // Update userChats for both participants
+    const userChatsRef = ref(db, `userChats/${uid}/${chatId}`);
+    const recipientChatsRef = ref(db, `userChats/${userId}/${chatId}`);
+    const chatSummary = {
+      name: chatUserName,
+      lastMessage: messageData.text,
+      timestamp: messageData.createdAt,
+    };
+
+    await set(userChatsRef, chatSummary);
+    await set(recipientChatsRef, {
+      name: user.displayName || "You",
+      lastMessage: messageData.text,
+      timestamp: messageData.createdAt,
     });
 
     setFormValue("");
@@ -72,57 +115,68 @@ const ChatWithUser = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-red-500 text-white p-4 flex items-center justify-between">
-        <button
-          onClick={() => navigate(-1)}
-          className="bg-white text-red-500 px-4 py-2 rounded-lg hover:bg-gray-200 transition"
-        >
-          Back
-        </button>
-        <h1 className="text-lg font-bold truncate">
-          {loadingUsername ? "Loading..." : chatUserName}
-        </h1>
-        <div className="w-16" />
-      </header>
+    <>
+      <Navbar
+        user={user}
+        onLogout={() => {}}
+        notifications={notifications}
+        showNotifications={showNotifications}
+        setShowNotifications={setShowNotifications}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+      />
+      <div className="flex flex-col h-screen bg-gray-100">
+        {/* Header */}
+        <header className="bg-red-500 text-white p-4 flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="bg-white text-red-500 px-4 py-2 rounded-lg hover:bg-gray-200 transition"
+          >
+            Back
+          </button>
+          <h1 className="text-lg font-bold truncate">
+            {loadingUsername ? "Loading..." : chatUserName}
+          </h1>
+          <div className="w-16" />
+        </header>
 
-      {/* Messages */}
-      <main className="flex-1 overflow-y-auto p-4">
-        {loadingMessages ? (
-          <div className="flex justify-center items-center h-full">
-            <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 animate-spin border-red-500"></div>
-          </div>
-        ) : (
-          <>
-            {messages?.map((msg) => (
-              <ChatMessage key={msg.id} message={msg} currentUserId={user.uid} />
-            ))}
-            <span ref={dummy} />
-          </>
-        )}
-      </main>
+        {/* Messages */}
+        <main className="flex-1 overflow-y-auto p-4">
+          {loadingMessages ? (
+            <div className="flex justify-center items-center h-full">
+              <div className="loader ease-linear rounded-full border-4 border-t-4 border-red-500 h-12 w-12 animate-spin"></div>
+            </div>
+          ) : (
+            <>
+              {messages.map((msg) => (
+                <ChatMessage key={msg.id} message={msg} currentUserId={user.uid} />
+              ))}
+              <span ref={dummy} />
+            </>
+          )}
+        </main>
 
-      {/* Input */}
-      <form
-        onSubmit={sendMessage}
-        className="flex items-center p-4 bg-white border-t border-gray-300"
-      >
-        <input
-          type="text"
-          value={formValue}
-          onChange={(e) => setFormValue(e.target.value)}
-          placeholder="Type your message..."
-          className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-        />
-        <button
-          type="submit"
-          className="ml-2 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+        {/* Input */}
+        <form
+          onSubmit={sendMessage}
+          className="flex items-center p-4 bg-white border-t border-gray-300"
         >
-          Send
-        </button>
-      </form>
-    </div>
+          <input
+            type="text"
+            value={formValue}
+            onChange={(e) => setFormValue(e.target.value)}
+            placeholder="Type your message..."
+            className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+          />
+          <button
+            type="submit"
+            className="ml-2 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+          >
+            Send
+          </button>
+        </form>
+      </div>
+    </>
   );
 };
 

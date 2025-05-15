@@ -8,7 +8,10 @@ import FindDonor from './Pages/FindDonor/FindDonor';
 import BloodDonationForm from './Pages/Donationform/Blooddonationform';
 import UserProfile from './Pages/UserProfile/UserProfile';
 import ProfileSetup from './Pages/ProfileSetup/ProfileSetup';
+import Chat from './components/Chat';
+import NotificationCenter from './components/NotificationCenter';
 import ChatWithUser from './Pages/ChatWithUser/ChatWithUser';
+import ChatList from './Pages/ChatList/ChatList';
 
 function App() 
 {   
@@ -25,6 +28,7 @@ function App()
   }
     return ( 
       <Router>
+        <NotificationCenter/>
         <Routes>
           <Route path="/signup" element={<Signuppage />} />
           <Route path="/signin" element={<Signinpage />} />
@@ -33,7 +37,9 @@ function App()
           <Route path="/profile/:userId" element={<UserProfile />} />  
           <Route path="/donate" element={<BloodDonationForm />} />
           <Route path="/profilesetup" element={<ProfileSetup />} />
-          <Route path="/chat/:userId" element={<ChatWithUser />} />
+          <Route path="/chats" element={<Chat />} />
+          {/* <Route path="/chat/:userId" element={<ChatWithUser />} />
+          <Route path="/chats" element={<ChatList />} /> */}
           <Route path="/" element={<Home />} />
         </Routes>
       </Router>
