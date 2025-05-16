@@ -10,7 +10,9 @@ const FindDonor = () => {
   const [donationRequests, setDonationRequests] = useState([]);
   const [filteredRequests, setFilteredRequests] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [userCity, setUserCity] = useState("Faridabad");
+  const [userCity, setUserCity] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [filterByCity, setFilterByCity] = useState(false);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -25,19 +27,17 @@ const FindDonor = () => {
             const city =
               data.results?.[0]?.components?.city ||
               data.results?.[0]?.components?.town;
-            setUserCity(city || "Faridabad");
+            setUserCity(city || "");
           } catch (error) {
             console.error("Error fetching geolocation data:", error);
-            setUserCity("Faridabad");
+            setUserCity("");
           }
         },
         (error) => {
           console.error("Geolocation error:", error);
-          setUserCity("Faridabad");
+          setUserCity("");
         }
       );
-    } else {
-      setUserCity("Faridabad");
     }
   }, []);
 
@@ -52,27 +52,39 @@ const FindDonor = () => {
         }));
         setDonationRequests(requestsArray);
       }
+      setLoading(false);
     });
   }, [database]);
 
   useEffect(() => {
-    console.log("Donation Requests:", donationRequests);
-    console.log("User City:", userCity);
-    console.log("Search Query:", searchQuery);
-
-    const results = donationRequests.filter(
-      (request) =>
-        request.bloodGroupRequired &&
-        request.bloodGroupRequired
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) &&
-        request.city &&
-        userCity &&
-        request.city.toLowerCase() === userCity.toLowerCase()
-    );
+    // Filter based on search query and optionally by city
+    const results = donationRequests.filter((request) => {
+      // First check if the blood group matches the search query
+      const bloodGroupMatches = 
+        !searchQuery || 
+        (request.bloodGroupRequired && 
+         request.bloodGroupRequired.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      // Then check if we need to filter by city
+      const cityMatches = 
+        !filterByCity || 
+        (request.city && 
+         userCity && 
+         request.city.toLowerCase() === userCity.toLowerCase());
+      
+      // Return true if both conditions are met
+      return bloodGroupMatches && cityMatches;
+    });
+    
+    console.log("Filtering results:", {
+      totalRequests: donationRequests.length,
+      filteredResults: results.length,
+      filterByCity,
+      userCity
+    });
+    
     setFilteredRequests(results);
-    console.log(filteredRequests);
-  }, [searchQuery, donationRequests, userCity]);
+  }, [searchQuery, donationRequests, userCity, filterByCity]);
 
   return (
     <section className="min-h-screen bg-gray-50 p-6">
@@ -88,8 +100,8 @@ const FindDonor = () => {
           </button>
         </nav>
 
-        {/* Search Bar */}
-        <div className="mt-6 text-center">
+        {/* Search and Filter Options */}
+        <div className="mt-6 flex flex-col md:flex-row gap-4 items-center justify-center">
           <input
             type="text"
             placeholder="Search by Blood Group..."
@@ -97,42 +109,60 @@ const FindDonor = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+          
+          {/* <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="cityFilter"
+              checked={filterByCity}
+              onChange={() => setFilterByCity(!filterByCity)}
+              className="h-4 w-4 text-red-600 border-gray-300 rounded"
+            />
+            <label htmlFor="cityFilter" className="text-gray-700">
+              Show only in my city {userCity ? `(${userCity})` : ""}
+            </label>
+          </div> */}
         </div>
 
         {/* Donor List */}
         <div className="mt-6 flex flex-wrap justify-center gap-6">
-  {filteredRequests.length > 0 ? (
-    filteredRequests.map((request) => (
-      <div
-        key={request.id}
-        className="p-6 bg-white shadow-md rounded-lg hover:shadow-lg transition cursor-pointer w-full sm:w-[45%] md:w-[30%]"
-        onClick={() => navigate(`/profile/${request.userId}`)}
-      >
-        <h3 className="text-lg font-bold text-gray-800">
-          {request.fullName}
-        </h3>
-
-        <p className="text-red-600 font-semibold">
-          Blood Group: {request.bloodGroupRequired}
-        </p>
-        <p className="text-gray-500">City: {request.city}</p>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(`/chat/${request.userId}`);
-          }}
-          className="mt-2 bg-red-600 text-white px-4 py-2 rounded-md"
-        >
-          Chat with Donor
-        </button>
-      </div>
-    ))
-  ) : (
-    <div className="w-full flex justify-center items-center min-h-[200px]">
-      <Helix size={65} speed={2.5} color="red" />
-    </div>
-  )}
-</div>
+          {loading ? (
+            <div className="w-full flex justify-center items-center min-h-[200px]">
+              <Helix size={65} speed={2.5} color="red" />
+            </div>
+          ) : filteredRequests.length > 0 ? (
+            filteredRequests.map((request) => (
+              <div
+                key={request.id}
+                className="p-6 bg-white shadow-md rounded-lg hover:shadow-lg transition cursor-pointer w-full sm:w-[45%] md:w-[30%]"
+                onClick={() => navigate(`/chats`)}
+              >
+                <h3 className="text-lg font-bold text-gray-800">
+                  {request.fullName}
+                </h3>
+                <p className="text-red-600 font-semibold">
+                  Blood Group: {request.bloodGroupRequired}
+                </p>
+                <p className="text-gray-500">City: {request.city || "Not specified"}</p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/chats`);
+                  }}
+                  className="mt-2 bg-red-600 text-white px-4 py-2 rounded-md"
+                >
+                  Chat with Donor
+                </button>
+              </div>
+            ))
+          ) : (
+            <div className="w-full text-center py-10">
+              <p className="text-gray-600 text-lg">
+                No donation requests found matching your criteria.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );
