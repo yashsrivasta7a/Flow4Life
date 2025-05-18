@@ -1,264 +1,563 @@
-import React, { useEffect, useState } from 'react';
-import { getAuth } from "firebase/auth";
-import { useForm } from 'react-hook-form';
-import { Label } from '@radix-ui/react-label';
-import { getDatabase, ref, push, serverTimestamp } from "firebase/database";
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { getAuth } from 'firebase/auth';
+import { getDatabase, ref, set, update, get } from 'firebase/database';
 import { useNavigate } from 'react-router-dom';
-import Navbar from '../../components/Navbar';
+import { toast } from 'react-hot-toast';
+import { Check, X, AlertCircle, Info, Calendar, Clock, Heart } from 'lucide-react';
+
+const SuccessModal = ({ isOpen, onClose }) => {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+        >
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.5, opacity: 0 }}
+            className="bg-white rounded-xl p-8 max-w-md w-full mx-4 relative"
+          >
+            <div className="absolute top-4 right-4">
+              <button
+                onClick={onClose}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-6">
+                <Heart className="h-8 w-8 text-red-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                Registration Successful!
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Thank you for registering as a blood donor. Your commitment to helping others is truly appreciated.
+                Together, we can save lives!
+              </p>
+              <button
+                onClick={onClose}
+                className="bg-red-600 text-white px-6 py-3 rounded-full font-semibold hover:bg-red-700 transition-colors"
+              >
+                Continue to Home
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
 
 const BloodDonationForm = () => {
   const navigate = useNavigate();
   const auth = getAuth();
-  const [user, setUser] = useState(null);
-  const { register, handleSubmit, formState: { errors } } = useForm();
-  const [loading, setLoading] = useState(false);
-  const [location, setLocation] = useState({ lng: 0, lat: 0 });
-  const [address, setAddress] = useState(null);
-  const [notifications, setNotifications] = useState([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const database = getDatabase();
+  const [loading, setLoading] = useState(true);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Check if user is already registered as donor
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lng: position.coords.longitude,
-            lat: position.coords.latitude,
-          });
-        },
-        (error) => {
-          console.error("Geolocation error:", error);
-        }
-      );
-    }
-  }, []);
-
-  useEffect(() => {
-    async function fetchLocation(lat, lng) {
-      if (!lat || !lng) return;
-
+    const checkDonorStatus = async () => {
       try {
-        const url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${"b3b3bbc277c2455fb37537202146f48e"}`;
-
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Failed to fetch location data");
-
-        const data = await res.json();
-        if (data.results.length > 0) {
-          const result = data.results[0].components;
-          setAddress({
-            state: result.state,
-            city: result.city || result.town || result.village,
-            zipcode: result.postcode,
-            country: result.country
-          });
+        const user = auth.currentUser;
+        if (!user) {
+          toast.error("Please sign in to continue");
+          navigate('/signin', { state: { from: '/donation-form' } });
+          return;
         }
+
+        const donorRef = ref(database, `donation_requests/${user.uid}`);
+        const snapshot = await get(donorRef);
+
+        if (snapshot.exists()) {
+          // User is already registered as a donor, redirect to blood requests
+          toast.success("Welcome back! Here are the current blood requests.", {
+            duration: 3000,
+            icon: '❤️'
+          });
+          navigate('/blood-requests');
+          return;
+        }
+        setLoading(false);
       } catch (error) {
-        console.error("Error fetching location:", error);
+        console.error('Error checking donor status:', error);
+        setLoading(false);
       }
-    }
+    };
 
-    if (location.lat && location.lng) {
-      fetchLocation(location.lat, location.lng);
-    }
-  }, [location.lat, location.lng]);
+    checkDonorStatus();
+  }, [auth, database, navigate]);
 
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        setUser(user);
-      } else {
-        setUser(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    age: '',
+    weight: '',
+    bloodType: '',
+    phone: '',
+    city: '',
+    lastDonation: '',
+    gender: '',
+  });
+
+  const [eligibilityAnswers, setEligibilityAnswers] = useState({
+    age: null,
+    weight: null,
+    health: null,
+    recentSurgery: null,
+    pregnancy: null,
+    medication: null,
+    infection: null,
+    vaccination: null,
+    travel: null,
+    risk: null,
+    diabetes: null,
+    heartCondition: null,
+    cancer: null,
+    bloodPressure: null,
+    hemoglobin: null,
+  });
+
+  const eligibilityQuestions = [
+    {
+      id: 'age',
+      question: 'Are you between 18-65 years old?',
+      requirement: 'You must be between 18-65 years old to donate blood.',
+      info: 'Regular donors over 65 may continue to donate with physician approval.',
+    },
+    {
+      id: 'weight',
+      question: 'Do you weigh more than 50kg/110lbs?',
+      requirement: 'Minimum weight requirement is 50kg/110lbs.',
+      info: 'This ensures your own safety during donation.',
+    },
+    {
+      id: 'health',
+      question: 'Are you in good health and feeling well today?',
+      requirement: 'You should be in good health and feeling well.',
+      info: 'No fever, cold, or other illnesses in the last week.',
+    },
+    {
+      id: 'hemoglobin',
+      question: 'Is your hemoglobin level above 12.5 g/dL (females) or 13.0 g/dL (males)?',
+      requirement: 'Minimum hemoglobin levels required for donation.',
+      info: 'If unsure, we will test your hemoglobin levels before donation.',
+    },
+    {
+      id: 'bloodPressure',
+      question: 'Is your blood pressure within normal range (systolic 90-180, diastolic 50-100)?',
+      requirement: 'Blood pressure must be within acceptable range.',
+      info: 'We will check your blood pressure before donation.',
+    },
+    {
+      id: 'recentSurgery',
+      question: 'Have you had any major surgery in the last 6 months?',
+      requirement: 'No major surgery in the past 6 months.',
+      disqualifyIf: true,
+      info: 'Minor procedures may require shorter waiting periods.',
+    },
+    {
+      id: 'pregnancy',
+      question: 'Are you pregnant, recently given birth, or breastfeeding?',
+      requirement: 'Not pregnant or within 6 months post-delivery.',
+      disqualifyIf: true,
+      info: 'Wait 6 months after giving birth before donating.',
+    },
+    {
+      id: 'medication',
+      question: 'Are you currently taking any antibiotics or other medication for an infection?',
+      requirement: 'No current antibiotics or infection medication.',
+      disqualifyIf: true,
+      info: 'Some medications may require waiting periods.',
+    },
+    {
+      id: 'infection',
+      question: 'Do you have any infectious diseases (HIV, Hepatitis B, Hepatitis C)?',
+      requirement: 'No infectious diseases.',
+      disqualifyIf: true,
+      info: 'This ensures recipient safety.',
+    },
+    {
+      id: 'diabetes',
+      question: 'Do you have well-controlled diabetes without complications?',
+      requirement: 'Diabetes must be well-controlled.',
+      info: 'Type 2 diabetes with good control may be acceptable.',
+    },
+    {
+      id: 'heartCondition',
+      question: 'Do you have any heart conditions or cardiovascular diseases?',
+      requirement: 'No severe heart conditions.',
+      disqualifyIf: true,
+      info: 'Some controlled conditions may be acceptable with physician approval.',
+    },
+    {
+      id: 'cancer',
+      question: 'Have you ever had cancer?',
+      requirement: 'No active cancer or ongoing treatment.',
+      disqualifyIf: true,
+      info: 'Cancer survivors may donate after 5 years of being cancer-free.',
+    },
+    {
+      id: 'vaccination',
+      question: 'Have you received any vaccinations in the last 4 weeks?',
+      requirement: 'No recent vaccinations.',
+      disqualifyIf: true,
+      info: 'Different vaccines have different waiting periods.',
+    },
+    {
+      id: 'travel',
+      question: 'Have you traveled to any disease-risk areas in the last 6 months?',
+      requirement: 'No recent travel to disease-risk areas.',
+      disqualifyIf: true,
+      info: 'Some travel restrictions may apply based on current health advisories.',
+    },
+    {
+      id: 'risk',
+      question: 'Have you engaged in any high-risk behaviors in the last 6 months?',
+      requirement: 'No high-risk behaviors.',
+      disqualifyIf: true,
+      info: 'This includes unsafe sexual practices or needle sharing.',
+    },
+  ];
+
+  const handleAnswerChange = (questionId, answer) => {
+    setEligibilityAnswers(prev => ({
+      ...prev,
+      [questionId]: answer
+    }));
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const isEligible = () => {
+    const requiredAnswers = eligibilityQuestions.every(q => {
+      if (q.disqualifyIf) {
+        return eligibilityAnswers[q.id] === false;
       }
+      return eligibilityAnswers[q.id] === true;
     });
+    return requiredAnswers;
+  };
 
-    return () => unsubscribe();
-  }, [auth]);
-
-  const onSubmit = async (data) => {
-    setLoading(true);
-    const userId = auth?.currentUser?.uid;
-    if (!userId) {
-      alert("You must be signed in to request blood.");
-      setLoading(false);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!isEligible()) {
+      toast.error("Sorry, you are not eligible to donate blood at this time.");
       return;
     }
 
-    const db = getDatabase();
-    const requestRef = ref(db, "donation_requests");
-
-    const requestData = {
-      userId,
-      fullName: user.displayName,
-      email: user.email,
-      number: data.number,
-      bloodGroup: data.bloodGroup,
-      weight: data.weight,
-      dateoflastdonation: data.dold,
-      state: address?.state,
-      city: address?.city,
-      zipcode: address?.zipcode,
-      address: data.address || "Not Provided",
-      consent: data.consent,
-      requestTime: serverTimestamp(),
-    };
-
     try {
-      await push(requestRef, requestData);
-      // alert("Blood request submitted successfully!");
-      navigate("/");
-    } catch (error) {
-      console.error("Error submitting request:", error);
-      alert("Failed to submit request.");
-    } finally {
+      const user = auth.currentUser;
+      if (!user) {
+        toast.error("Please sign in to register as a donor");
+        navigate('/signin', { state: { from: '/donation-form' } });
+        return;
+      }
 
-      setLoading(false);
+      // Create user profile data
+      const userData = {
+        ...formData,
+        userId: user.uid,
+        email: user.email,
+        timestamp: Date.now(),
+        type: 'donor',
+        status: 'active',
+        lastUpdated: Date.now()
+      };
+
+      // Create donation request data
+      const donationRequestData = {
+        userId: user.uid,
+        name: formData.name,
+        bloodType: formData.bloodType,
+        city: formData.city,
+        phone: formData.phone,
+        timestamp: Date.now(),
+        status: 'available',
+        lastDonation: formData.lastDonation || null,
+        age: formData.age,
+        gender: formData.gender,
+        weight: formData.weight
+      };
+
+      // Update both nodes
+      await Promise.all([
+        set(ref(database, `users/${user.uid}`), userData),
+        set(ref(database, `donation_requests/${user.uid}`), donationRequestData)
+      ]);
+
+      // Show success message
+      toast.success(
+        "Thank you for registering as a donor! You're making a difference.", 
+        {
+          duration: 3000,
+          position: 'top-center',
+          style: {
+            background: '#10B981',
+            color: '#FFFFFF',
+            padding: '16px',
+            borderRadius: '8px',
+          },
+          icon: '❤️'
+        }
+      );
+
+      // Show success modal
+      setShowSuccessModal(true);
+
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      if (error.code === 'PERMISSION_DENIED') {
+        toast.error("Permission denied. Please make sure you're properly signed in.");
+      } else {
+        toast.error("Error submitting form. Please try again.");
+      }
     }
   };
 
+  const handleModalClose = () => {
+    setShowSuccessModal(false);
+    navigate('/blood-requests');
+  };
+
   return (
-    <>
-      <Navbar
-        user={user}
-        onLogout={() => {}}
-        notifications={notifications}
-        showNotifications={showNotifications}
-        setShowNotifications={setShowNotifications}
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
-      />
-      <div className="flex justify-center items-center bg-gray-100 p-4 min-h-screen">
-        <div className="bg-white shadow-xl rounded-2xl p-6 max-w-lg w-full transition transform hover:scale-105 duration-300 ease-in-out overflow-y-auto max-h-[80vh] custom-scrollbar">
-          <h2 className="text-2xl font-semibold text-center text-gray-800 mb-6">Blood Donation Form</h2>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="flex flex-col">
-              <Label htmlFor="fullName" className="block text-gray-700 font-medium mb-1">
-                Full Name
-              </Label>
-              <p>{user?.displayName}</p>
+    <div className="min-h-screen w-full bg-gradient-to-b from-red-50 to-white py-12 px-4 sm:px-6 lg:px-8">
+      <SuccessModal isOpen={showSuccessModal} onClose={handleModalClose} />
+      {loading ? (
+        <div className="flex justify-center items-center h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-red-500 border-t-transparent"></div>
             </div>
-            <div className="flex flex-col">
-              <Label className="block text-gray-700 font-medium mb-1">
-                Email
-              </Label>
-              <p>{user?.email}</p>
-            </div>
-            <div className="flex flex-col">
-              <Label htmlFor="mobile" className="block text-gray-700 font-medium mb-1">
-                Mobile Number
-              </Label>
+      ) : (
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-soft p-8"
+          >
+            <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">Blood Donor Registration</h1>
+
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {/* Personal Information */}
+              <div className="space-y-6 bg-gray-50 p-6 rounded-xl border border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-900">Personal Information</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
               <input
                 type="text"
-                id="number"
-                placeholder="Enter your number"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                {...register("number", {
-                  required: "Mobile number is required",
-                  pattern: {
-                    value: /^[0-9]{10}$/,
-                    message: "Enter a valid 10-digit mobile number",
-                  },
-                })}
-              />
-              {errors.number && (
-                <p className="text-sm text-red-500 mt-1">
-                  {errors.number.message}
-                </p>
-              )}
+                      name="name"
+                      required
+                      className="input"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                    <select
+                      name="gender"
+                      required
+                      className="input"
+                      value={formData.gender}
+                      onChange={handleInputChange}
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Age</label>
+                    <input
+                      type="number"
+                      name="age"
+                      required
+                      min="18"
+                      max="65"
+                      className="input"
+                      value={formData.age}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Weight (kg)</label>
+                    <input
+                      type="number"
+                      name="weight"
+                      required
+                      min="50"
+                      className="input"
+                      value={formData.weight}
+                      onChange={handleInputChange}
+                    />
             </div>
-            <div className="flex flex-col">
-              <Label htmlFor="bloodGroup" className="block text-gray-700 font-medium mb-1">
-                Blood Group
-              </Label>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Blood Type</label>
               <select
-                id="bloodGroup"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                {...register('bloodGroup', { required: 'Blood Group is required' })}
-              >
-                <option value="">-- Select Blood Group --</option>
+                      name="bloodType"
+                      required
+                      className="input"
+                      value={formData.bloodType}
+                      onChange={handleInputChange}
+                    >
+                      <option value="">Select Blood Type</option>
                 <option value="A+">A+</option>
                 <option value="A-">A-</option>
                 <option value="B+">B+</option>
                 <option value="B-">B-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
                 <option value="O+">O+</option>
                 <option value="O-">O-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
               </select>
-              {errors.bloodGroup && (
-                <p className="text-sm text-red-500 mt-1">
-                  {errors.bloodGroup.message}
-                </p>
-              )}
             </div>
-            <div className="flex flex-col">
-              <Label htmlFor="weight" className="block text-gray-700 font-medium mb-1">
-                Weight
-              </Label>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Last Donation Date</label>
+                    <div className="relative">
               <input
-                type="number"
-                id="weight"
-                placeholder='Enter your Weight in Kgs'
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                {...register('weight', { required: 'Weight is required' })}
-              />
-              {errors.weight && (
-                <p className="text-sm text-red-500 mt-1">
-                  {errors.weight.message}
-                </p>
-              )}
+                        type="date"
+                        name="lastDonation"
+                        className="input"
+                        value={formData.lastDonation}
+                        onChange={handleInputChange}
+                      />
+                      <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    </div>
             </div>
-            <div className="flex flex-col">
-              <Label htmlFor="dold" className="block text-gray-700 font-medium mb-1">
-                Date of Last Donation
-              </Label>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
               <input
-                type="date"
-                id="dold"
-                placeholder='Enter your Last Donation Date'
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                {...register('dold')}
+                      type="tel"
+                      name="phone"
+                      required
+                      className="input"
+                      value={formData.phone}
+                      onChange={handleInputChange}
               />
             </div>
-            <div className="flex flex-col">
-              <Label className="block text-gray-700 font-medium mb-1">
-                City : {address?.city}
-              </Label>
-              <Label className="block text-gray-700 font-medium mb-1">
-                State : {address?.state}
-              </Label>
-              <Label className="block text-gray-700 font-medium mb-1">
-                Pincode : {address?.zipcode}
-              </Label>
-              <Label className="block text-gray-700 font-medium mb-1">
-                Country : {address?.country}
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
               <input
-                type="checkbox"
-                className="w-4 h-4 border border-gray-300 rounded-full"
-                {...register("consent", { required: "You must agree before submitting" })}
-              />
-              <label className="text-sm text-gray-700">
-                I agree to donate my blood and confirm that the provided information is accurate.
-              </label>
+                      type="text"
+                      name="city"
+                      required
+                      className="input"
+                      value={formData.city}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Eligibility Questions */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-semibold text-gray-900">Eligibility Questionnaire</h2>
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Clock className="w-4 h-4 mr-1" />
+                    <span>Takes about 5 minutes</span>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                  <div className="flex items-start gap-3">
+                    <Info className="w-5 h-5 text-blue-500 mt-0.5" />
+                    <p className="text-sm text-blue-700">
+                      Please answer all questions honestly. Your accurate responses help ensure both donor and recipient safety.
+                      All information provided is confidential.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  {eligibilityQuestions.map((q) => (
+                    <div key={q.id} className="bg-gray-50 p-6 rounded-lg border border-gray-100 hover:bg-gray-100 transition-colors">
+                      <div className="flex items-start gap-4">
+                        <div className="flex-grow">
+                          <p className="text-gray-900 font-medium">{q.question}</p>
+                          <p className="text-sm text-gray-600 mt-1">{q.requirement}</p>
+                          {q.info && (
+                            <div className="mt-2 flex items-start gap-2 text-sm text-blue-600">
+                              <Info className="w-4 h-4 mt-0.5" />
+                              <p>{q.info}</p>
+                            </div>
+                          )}
             </div>
-            {errors.consent && <p className="text-red-500 text-sm">{errors.consent.message}</p>}
-            <div className="flex justify-center">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleAnswerChange(q.id, true)}
+                            className={`px-4 py-2 rounded-full flex items-center gap-2 ${
+                              eligibilityAnswers[q.id] === true
+                                ? 'bg-green-500 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                          >
+                            <Check className="w-4 h-4" /> Yes
+                          </button>
               <button
-                type="submit"
-                className="bg-red-500 text-white font-semibold px-6 py-3 rounded-full hover:bg-red-600 shadow-lg disabled:opacity-50 transition duration-200 ease-in-out transform hover:scale-105"
-                disabled={loading}
-              >
-                {loading ? "Submitting..." : "Donate Blood"}
+                            type="button"
+                            onClick={() => handleAnswerChange(q.id, false)}
+                            className={`px-4 py-2 rounded-full flex items-center gap-2 ${
+                              eligibilityAnswers[q.id] === false
+                                ? 'bg-red-500 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            }`}
+                          >
+                            <X className="w-4 h-4" /> No
               </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex flex-col items-center gap-4 bg-gray-50 p-6 rounded-xl border border-gray-100">
+                {!isEligible() && Object.values(eligibilityAnswers).some(answer => answer !== null) && (
+                  <div className="bg-red-50 p-4 rounded-lg w-full border border-red-100">
+                    <div className="flex items-center gap-2 text-red-700">
+                      <AlertCircle className="w-5 h-5" />
+                      <p>Based on your answers, you may not be eligible to donate blood at this time.</p>
+                    </div>
+                    <p className="mt-2 text-sm text-red-600">
+                      Please consult with a healthcare provider for more information about your eligibility status.
+                    </p>
+                  </div>
+                )}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.95 }}
+                  type="submit"
+                  className="btn btn-primary w-full max-w-md"
+                  disabled={!isEligible()}
+                >
+                  Register as Donor
+                </motion.button>
+                <p className="text-sm text-gray-500 text-center">
+                  By registering, you agree to be contacted when your blood type is needed in your area.
+                </p>
             </div>
           </form>
+          </motion.div>
         </div>
+      )}
       </div>
-    </>
   );
 };
 

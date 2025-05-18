@@ -1,57 +1,116 @@
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { Label } from '@radix-ui/react-label';
-import { getDatabase, ref, push, serverTimestamp } from "firebase/database";
-import { auth } from "../../Utils/Firebase.jsx";
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { getAuth } from 'firebase/auth';
+import { getDatabase, ref, set, push } from 'firebase/database';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
+import { AlertCircle, Clock, MapPin } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 
-const RequestForm = () => {
-    const { register, handleSubmit, formState: { errors } } = useForm();
+const RequestForm = ({ emergency = false }) => {
+    const navigate = useNavigate();
+    const auth = getAuth();
+    const database = getDatabase();
     const [loading, setLoading] = useState(false);
     const [user, setUser] = useState(null);
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [userLocation, setUserLocation] = useState(null);
 
-    const onSubmit = async (data) => {
-        setLoading(true);
+    const [formData, setFormData] = useState({
+        patientName: '',
+        age: '',
+        bloodType: '',
+        units: '',
+        hospital: '',
+        city: '',
+        contactNumber: '',
+        urgency: emergency ? 'emergency' : 'normal',
+        additionalInfo: '',
+        latitude: '',
+        longitude: ''
+    });
 
-        const userId = auth?.currentUser?.uid;
-        if (!userId) {
-            alert("You must be signed in to request blood.");
-            setLoading(false);
-            return;
+    useEffect(() => {
+        // Set urgency to emergency if coming from emergency route
+        if (emergency) {
+            setFormData(prev => ({
+                ...prev,
+                urgency: 'emergency'
+            }));
         }
 
-        const db = getDatabase();
-        const requestRef = ref(db, "blood_requests");
+        // Get user's location when component mounts
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setUserLocation({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    });
+                    setFormData(prev => ({
+                        ...prev,
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    }));
+                },
+                (error) => {
+                    console.error("Error getting location:", error);
+                    toast.error("Please enable location services for better matching with nearby donors");
+                }
+            );
+        }
+    }, [emergency]);
 
-        const requestData = {
-            userId,
-            fullName: data.fullName,
-            email: data.email,
-            number: data.number,
-            bloodGroupRequired: data.bloodGroupRequired,
-            urgency: data.urgency,
-            dateNeeded: data.dateNeeded,
-            state: data.state,
-            city: data.city,
-            zipcode: data.zipcode,
-            hospitalName: data.hospitalName,
-            reason: data.reason || "Not specified",
-            additionalMessage: data.addmsg || "No additional message",
-            status: "pending",
-            requestTime: serverTimestamp(),
-        };
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
 
         try {
-            await push(requestRef, requestData);
-            alert("Blood request submitted successfully!");
+            const user = auth.currentUser;
+            if (!user) {
+                toast.error("Please sign in to submit a blood request");
+                navigate('/signin', { state: { from: '/request-form' } });
+                return;
+            }
+
+            const requestData = {
+                ...formData,
+                userId: user.uid,
+                userEmail: user.email,
+                timestamp: Date.now(),
+                status: 'active',
+                isEmergency: emergency,
+                location: userLocation || null
+            };
+
+            // Add to blood_requests node
+            const newRequestRef = push(ref(database, 'blood_requests'));
+            await set(newRequestRef, requestData);
+
+            toast.success("Blood request submitted successfully!");
+
+            // Navigate to FindDonor page with request details
+            navigate('/finddonor', { 
+                state: { 
+                    requestId: newRequestRef.key,
+                    bloodType: formData.bloodType,
+                    isEmergency: emergency,
+                    location: userLocation
+                }
+            });
+
         } catch (error) {
-            console.error("Error submitting request:", error);
-            alert("Failed to submit request.");
-        } finally {
-            setLoading(false);
+            console.error('Error submitting request:', error);
+            toast.error("Error submitting request. Please try again.");
         }
     };
 
@@ -66,193 +125,239 @@ const RequestForm = () => {
                 menuOpen={menuOpen}
                 setMenuOpen={setMenuOpen}
             />
-            <div className="flex justify-center items-center bg-gray-100 p-4 min-h-screen ">
-                <div className="bg-white shadow-xl rounded-2xl p-6 max-w-lg w-full 
-                      transition transform hover:scale-105 duration-300 ease-in-out 
-                      overflow-y-auto max-h-[80vh] custom-scrollbar">
-                    <h2 className="text-2xl font-semibold text-center text-gray-800 mb-6">Blood Request Form</h2>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-
-                        {/* Full Name */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="fullName" className="block text-gray-700 font-medium mb-1">Full Name</Label>
-                            <input
-                                type="text"
-                                id="fullName"
-                                placeholder="Enter your full name"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                                {...register('fullName', { required: 'Name is required' })}
-                            />
-                            {errors.fullName && <p className="text-sm text-red-500 mt-1">{errors.fullName.message}</p>}
+            <div className="min-h-screen w-full bg-gradient-to-b from-background to-surface py-12 px-4 sm:px-6 lg:px-8">
+                <div className="w-full max-w-4xl mx-auto">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-white rounded-2xl shadow-soft p-8"
+                    >
+                        <div className="flex items-center justify-center gap-3 mb-8">
+                            <h1 className="text-3xl font-bold text-gray-900 text-center">
+                                {emergency ? 'Emergency Blood Request' : 'Request Blood'}
+                            </h1>
+                            {emergency && (
+                                <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full flex items-center gap-2">
+                                    <AlertCircle className="w-5 h-5" />
+                                    <span className="font-medium">Emergency</span>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Email */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="email" className="block text-gray-700 font-medium mb-1">Email</Label>
-                            <input
-                                type="email"
-                                id="email"
-                                placeholder="Enter your email"
-                                className="border border-gray-300 p-2 rounded-md focus:ring focus:ring-blue-300"
-                                {...register('email', { required: 'Email is required' })}
-                            />
-                            {errors.email && <p className="text-sm text-red-500 mt-1">{errors.email.message}</p>}
-                        </div>
+                        {emergency && (
+                            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8">
+                                <div className="flex items-start gap-3">
+                                    <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
+                                    <div>
+                                        <p className="text-red-700 font-medium">Emergency Request</p>
+                                        <p className="text-red-600 text-sm">
+                                            This request will be marked as high priority and immediately notified to all eligible donors in your area.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                        {/* Mobile Number */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="number" className="block text-gray-700 font-medium mb-1">Mobile Number</Label>
-                            <input
-                                type="text"
-                                id="number"
-                                placeholder="Enter your number"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                                {...register("number", {
-                                    required: "Mobile number is required",
-                                    pattern: { value: /^[0-9]{10}$/, message: "Enter a valid 10-digit mobile number" }
-                                })}
-                            />
-                            {errors.number && <p className="text-sm text-red-500 mt-1">{errors.number.message}</p>}
-                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-8">
+                            {/* Patient Information */}
+                            <div className="space-y-6">
+                                <h2 className="text-xl font-semibold text-gray-900">Patient Information</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Patient Name</label>
+                                        <input
+                                            type="text"
+                                            name="patientName"
+                                            required
+                                            className="input"
+                                            value={formData.patientName}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Age</label>
+                                        <input
+                                            type="number"
+                                            name="age"
+                                            required
+                                            className="input"
+                                            value={formData.age}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Blood Type Needed</label>
+                                        <select
+                                            name="bloodType"
+                                            required
+                                            className="input"
+                                            value={formData.bloodType}
+                                            onChange={handleInputChange}
+                                        >
+                                            <option value="">Select Blood Type</option>
+                                            <option value="A+">A+</option>
+                                            <option value="A-">A-</option>
+                                            <option value="B+">B+</option>
+                                            <option value="B-">B-</option>
+                                            <option value="AB+">AB+</option>
+                                            <option value="AB-">AB-</option>
+                                            <option value="O+">O+</option>
+                                            <option value="O-">O-</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Units Required</label>
+                                        <input
+                                            type="number"
+                                            name="units"
+                                            required
+                                            min="1"
+                                            className="input"
+                                            value={formData.units}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
 
-                        {/* Blood Group */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="bloodGroupRequired" className="block text-gray-700 font-medium mb-1">Blood Group Required</Label>
-                            <select
-                                id="bloodGroupRequired"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                                {...register('bloodGroupRequired', { required: 'Blood Group is required' })}
-                            >
-                                <option value="">-- Select Blood Group --</option>
-                                <option value="A+">A+</option>
-                                <option value="A-">A-</option>
-                                <option value="B+">B+</option>
-                                <option value="B-">B-</option>
-                                <option value="O+">O+</option>
-                                <option value="O-">O-</option>
-                                <option value="AB+">AB+</option>
-                                <option value="AB-">AB-</option>
-                            </select>
-                            {errors.bloodGroupRequired && <p className="text-sm text-red-500 mt-1">{errors.bloodGroupRequired.message}</p>}
-                        </div>
+                            {/* Location Information */}
+                            <div className="space-y-6">
+                                <h2 className="text-xl font-semibold text-gray-900">Location Information</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Hospital Name</label>
+                                        <input
+                                            type="text"
+                                            name="hospital"
+                                            required
+                                            className="input"
+                                            value={formData.hospital}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                                        <input
+                                            type="text"
+                                            name="city"
+                                            required
+                                            className="input"
+                                            value={formData.city}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
 
-                        {/* Urgency Level */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="urgency" className="block text-gray-700 font-medium mb-1">Urgency Level</Label>
-                            <select
-                                id="urgency"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                                {...register('urgency', { required: 'Urgency level is required' })}
-                            >
-                                <option value="">-- Select Urgency --</option>
-                                <option value="Emergency">Emergency</option>
-                                <option value="24_hours">Within 24 Hours</option>
-                                <option value="week">Within a week</option>
-                            </select>
-                            {errors.urgency && <p className="text-sm text-red-500 mt-1">{errors.urgency.message}</p>}
-                        </div>
+                            {/* Urgency Level - Only show if not emergency */}
+                            {!emergency && (
+                                <div className="space-y-4">
+                                    <h2 className="text-xl font-semibold text-gray-900">Urgency Level</h2>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleInputChange({ target: { name: 'urgency', value: 'normal' } })}
+                                            className={`p-4 rounded-lg border-2 flex flex-col items-center gap-2 ${
+                                                formData.urgency === 'normal'
+                                                    ? 'border-green-500 bg-green-50'
+                                                    : 'border-gray-200 hover:border-green-500'
+                                            }`}
+                                        >
+                                            <Clock className="w-6 h-6 text-green-500" />
+                                            <span className="font-medium">Normal</span>
+                                            <span className="text-sm text-gray-500">Within 24 hours</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleInputChange({ target: { name: 'urgency', value: 'urgent' } })}
+                                            className={`p-4 rounded-lg border-2 flex flex-col items-center gap-2 ${
+                                                formData.urgency === 'urgent'
+                                                    ? 'border-yellow-500 bg-yellow-50'
+                                                    : 'border-gray-200 hover:border-yellow-500'
+                                            }`}
+                                        >
+                                            <Clock className="w-6 h-6 text-yellow-500" />
+                                            <span className="font-medium">Urgent</span>
+                                            <span className="text-sm text-gray-500">Within 6 hours</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleInputChange({ target: { name: 'urgency', value: 'emergency' } })}
+                                            className={`p-4 rounded-lg border-2 flex flex-col items-center gap-2 ${
+                                                formData.urgency === 'emergency'
+                                                    ? 'border-red-500 bg-red-50'
+                                                    : 'border-gray-200 hover:border-red-500'
+                                            }`}
+                                        >
+                                            <AlertCircle className="w-6 h-6 text-red-500" />
+                                            <span className="font-medium">Emergency</span>
+                                            <span className="text-sm text-gray-500">Immediate need</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
-                        {/* Date needed */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="dateNeeded" className="block text-gray-700 font-medium mb-1">Required Date </Label>
-                            <input
-                                type="date"
-                                id="dateneeded"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                                {...register('dateNeeded', { required: "Date is required" })}
-                            />
-                            {errors.dateNeeded && <p className="text-sm text-red-500 mt-1">{errors.dateNeeded.message}</p>}
-                        </div>
+                            {/* Contact Information */}
+                            <div className="space-y-6">
+                                <h2 className="text-xl font-semibold text-gray-900">Contact Information</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Contact Number</label>
+                                        <input
+                                            type="tel"
+                                            name="contactNumber"
+                                            required
+                                            className="input"
+                                            value={formData.contactNumber}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
 
+                            {/* Additional Information */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Additional Information</label>
+                                <textarea
+                                    name="additionalInfo"
+                                    rows="4"
+                                    className="input"
+                                    value={formData.additionalInfo}
+                                    onChange={handleInputChange}
+                                    placeholder="Any additional details that might be helpful..."
+                                ></textarea>
+                            </div>
 
-                        {/* Location Fields */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="state" className="block text-gray-700 font-medium mb-1">State</Label>
-                            <input
-                                type="text"
-                                id="state"
-                                placeholder="Enter your state"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                                {...register("state", { required: "State is required" })}
-                            />
-                            {errors.state && <p className="text-sm text-red-500 mt-1">{errors.state.message}</p>}
-                        </div>
-
-                        <div className="flex flex-col">
-                            <Label htmlFor="city" className="block text-gray-700 font-medium mb-1">City</Label>
-                            <input
-                                type="text"
-                                id="city"
-                                placeholder="Enter your city"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                                {...register("city", { required: "City is required" })}
-                            />
-                            {errors.city && <p className="text-sm text-red-500 mt-1">{errors.city.message}</p>}
-                        </div>
-
-                        {/* ZipCode */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="zipcode" className="block text-gray-700 font-medium mb-1">Zipcode</Label>
-                            <input
-                                type="number"
-                                id="zipcode"
-                                placeholder="Enter your zipcode"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                                {...register('zipcode', { required: 'Zipcode is required' })}
-                            />
-                            {errors.zipcode && <p className="text-sm text-red-500 mt-1">{errors.zipcode.message}</p>}
-                        </div>
-
-
-
-                        {/* Hospital Name */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="hospitalName" className="block text-gray-700 font-medium mb-1">Hospital Name</Label>
-                            <input
-                                type="text"
-                                id="hospitalName"
-                                placeholder="Enter hospital name"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                                {...register("hospitalName", { required: "Hospital name is required" })}
-                            />
-                            {errors.hospitalName && <p className="text-sm text-red-500 mt-1">{errors.hospitalName.message}</p>}
-                        </div>
-
-                        {/* Reason */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="reason" className="block text-gray-700 font-medium mb-1">Reason (e.g., Accident case, Surgery)</Label>
-                            <textarea
-                                id="reason"
-                                placeholder="Enter your reason"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                                {...register("reason", { required: "Reason is required" })}
-                            />
-                            {errors.reason && <p className="text-sm text-red-500 mt-1">{errors.reason.message}</p>}
-                        </div>
-
-                        {/* Additional Message */}
-                        <div className="flex flex-col">
-                            <Label htmlFor="addmsg" className="block text-gray-700 font-medium mb-1">Additional Message (Optional)</Label>
-                            <textarea
-                                id="addmsg"
-                                placeholder="Any additional information"
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 transition outline-none"
-                                {...register("addmsg")}
-                            />
-                        </div>
-
-                        {/* Submit Button */}
-                        <div className="flex justify-center">
-                            <button
-                                type="submit"
-                                className="bg-red-500 text-white font-semibold px-6 py-3 rounded-full hover:bg-red-600  shadow-lg disabled:opacity-50  transition duration-200 ease-in-out transform hover:scale-105 "
-                                disabled={loading}
-                            >
-                                {loading ? "Submitting..." : "Submit Request"}
-                            </button>
-                        </div>
-
-                    </form>
+                            {/* Submit Button */}
+                            <div className="flex flex-col items-center gap-4">
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    type="submit"
+                                    className={`w-full max-w-md px-8 py-4 rounded-full font-semibold text-white ${
+                                        emergency
+                                            ? 'bg-red-600 hover:bg-red-700'
+                                            : 'bg-blue-600 hover:bg-blue-700'
+                                    } transition-colors flex items-center justify-center gap-2`}
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    ) : (
+                                        <>
+                                            {emergency ? 'Submit Emergency Request' : 'Submit Request'}
+                                            {emergency && <AlertCircle className="w-5 h-5" />}
+                                        </>
+                                    )}
+                                </motion.button>
+                                <p className="text-sm text-gray-500 text-center">
+                                    {emergency
+                                        ? 'Your emergency request will be immediately notified to nearby donors'
+                                        : 'You will be notified when donors respond to your request'}
+                                </p>
+                            </div>
+                        </form>
+                    </motion.div>
                 </div>
             </div>
         </>

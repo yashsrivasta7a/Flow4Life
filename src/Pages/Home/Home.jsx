@@ -1,260 +1,214 @@
 import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { Heart, Search } from 'lucide-react';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getDatabase, ref, onValue, set } from 'firebase/database';
-import { getMessaging, onMessage, getToken } from 'firebase/messaging';
-import { app } from "../../Utils/Firebase";
-import { useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Droplet, MapPin, Users, Heart, ArrowRight, ChevronRight, MessageCircle, Heading1 } from "lucide-react";
-import blood from '../../assets/blood.png'
-import { toast } from "react-hot-toast";
+import { getDatabase, ref, get } from 'firebase/database';
+import { Link } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import Navbar from '../../components/Navbar';
 
 const Home = () => {
   const navigate = useNavigate();
-  const auth = getAuth(app);
-  const database = getDatabase();
-  const messaging = getMessaging(app);
-
+  const auth = getAuth();
+  const db = getDatabase();
   const [user, setUser] = useState(null);
-  const [donationRequests, setDonationRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
+  const [userType, setUserType] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [notificationToken, setNotificationToken] = useState(null);
-  const [showScroll, setShowScroll] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUser(user);
-        requestNotificationPermission();
-      } else {
-        navigate('/signin');
+    const unsubscribe = onAuthStateChanged(auth, 
+      async (currentUser) => {
+        setUser(currentUser);
+        
+        if (currentUser) {
+          // Check if user has a profile and user type
+          try {
+            const userRef = ref(db, `users/${currentUser.uid}`);
+            const snapshot = await get(userRef);
+            
+            if (snapshot.exists()) {
+              setUserType(snapshot.val().userType || 'donor');
+            }
+          } catch (error) {
+            console.error("Error fetching user data:", error);
+          }
+        }
+        
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Auth state change error:", error);
+        setAuthError(error.message);
+        setLoading(false);
       }
-    });
+    );
+
     return () => unsubscribe();
-  }, [auth, navigate]);
+  }, [auth, db]);
 
-  useEffect(() => {
-    const donationRequestsRef = ref(database, 'donation_requests');
-    onValue(donationRequestsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setDonationRequests(Object.values(data)); // No city filter, show all
-      }
-      setLoading(false);
-    });
-  }, [database]);
-
-  useEffect(() => {
-    onMessage(messaging, (payload) => {
-      console.log('Message received in foreground: ', payload)
-      setNotifications((prev) => [...prev, payload.notification]);
-      toast.success(payload.notification?.title || "New notification");
-    });
-  }, [messaging]);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowScroll(window.scrollY > 300);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const requestNotificationPermission = async () => {
-    try {
-      const token = await getToken(messaging, { vapidKey: 'BGdFd5iKrCCk65_Ld6mWv9XAutBRVe1Q5RmCHylozHlT5uwJBQfiCxUubjqoIOJM0bW2Ctg1cXKU6c0tXJ5dYJQ' });
-      const userId = auth.currentUser?.uid;
-      if (token && userId) {
-        await set(ref(database, `users/${userId}/fcmToken`), token);
-        setNotificationToken(token); // Save token to state
-      }
-      console.log('Notification token:', token);
-
-    } catch (error) {
-      console.error('Error getting notification token:', error);
+  const handleAuthAction = (path, userType) => {
+    if (user) {
+      // If user is logged in, redirect them to the correct home page
+      navigate(path);
+    } else {
+      // If not logged in, send to signup with the userType
+      navigate('/signup', { state: { userType } });
     }
   };
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    navigate('/signin');
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      toast.success('Signed out successfully');
+      navigate('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast.error('Error signing out');
+    }
   };
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen w-full bg-gradient-to-b from-purple-50 to-white flex items-center justify-center">
+        <div className="text-red-500 text-xl">Loading...</div>
+      </div>
+    );
+  }
 
-  // const stats = [
-  //   { icon: <Droplet className="w-8 h-8 text-red-500" />, value: "1,000+", label: "Blood Donations" },
-  //   { icon: <Users className="w-8 h-8 text-red-500" />, value: "5,000+", label: "Active Donors" },
-  //   { icon: <MapPin className="w-8 h-8 text-red-500" />, value: "50+", label: "Cities Covered" },
-  // ];
+  if (authError) {
+    return (
+      <div className="min-h-screen w-full bg-gradient-to-b from-purple-50 to-white flex items-center justify-center">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">{authError}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
       <Navbar
         user={user}
-        onLogout={handleLogout}
+        onLogout={handleSignOut}
         notifications={notifications}
         showNotifications={showNotifications}
         setShowNotifications={setShowNotifications}
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
       />
-      <div className="min-h-screen bg-gradient-to-b from-background to-surface">
-        {/* Hero Section */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="text-center">
-            <motion.h1
-              className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              Save Lives Through
-              <span className="text-red-500"> Blood Donation</span>
-            </motion.h1>
-            <motion.p
-              className="text-xl text-gray-600 mb-8"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-            >
-              Connect with blood donors in your area and help save lives
-            </motion.p>
+      <div className="min-h-screen w-full bg-gradient-to-b from-purple-50 to-white">
+        <div className="w-full px-4 py-20 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center mb-16 w-full"
+          >
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+              Welcome to
+              <span className="text-red-500"> Flow4Life</span>
+            </h1>
+            <p className="text-xl text-gray-600 mb-8 mx-auto max-w-3xl">
+              Connecting blood donors with those in need. Every donation counts, every life matters.
+            </p>
+            {/*{user && (
+              <div className="bg-purple-100 text-purple-800 px-4 py-2 rounded-lg inline-block mb-8">
+                Logged in as: {user.displayName || user.email}
+                {userType && (
+                  <span className="ml-2 text-sm bg-purple-200 px-2 py-1 rounded">
+                    {userType === 'donor' ? 'Donor' : 'Requester'}
+                  </span>
+                )}
+              </div>
+            )} */}
+            
+            {user && userType && (
+              <div className="mb-8">
+                {/* <Link
+                  to={userType === 'donor' ? '/donor' : '/requester'}
+                  className="bg-red-500 text-white px-6 py-2 rounded-full hover:bg-red-600 transition-colors"
+                >
+                  Go to Your Dashboard
+                </Link> */}
+              </div>
+            )}
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+            {/* Donor Card */}
             <motion.div
-              className="flex flex-wrap justify-center gap-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
+              whileHover={{ scale: 1.02 }}
+              className="bg-gradient-to-br from-red-50 to-red-100 p-8 rounded-2xl shadow-soft hover:shadow-lg transition-all cursor-pointer h-full"
+              onClick={() => handleAuthAction('/donor', 'donor')}
             >
-              <button
-                onClick={() => navigate("/finddonor")}
-                className="bg-red-500 text-white px-8 py-3 rounded-full hover:bg-red-600 transition-colors shadow-sm hover:shadow flex items-center gap-2"
-              >
-                Donate Blood <Heart className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => navigate("/requestform")}
-                className="bg-white text-red-500 border-2 border-red-500 px-8 py-3 rounded-full hover:bg-red-50 transition-colors shadow-sm hover:shadow flex items-center gap-2"
-              >
-                Request Blood <ArrowRight className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => navigate("/chats")}
-                className="bg-blue-500 text-white px-8 py-3 rounded-full hover:bg-blue-600 transition-colors shadow-sm hover:shadow flex items-center gap-2"
-              >
-                View Chats <MessageCircle className="w-5 h-5" />
-              </button>
+              <div className="flex justify-center mb-6">
+                <Heart className="w-16 h-16 text-red-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-red-600 mb-4">I Want to Donate</h2>
+              <p className="text-gray-600 mb-6">
+                Join our community of heroes. Your blood donation can save up to three lives.
+              </p>
+              <div className="bg-red-500 text-white px-6 py-3 rounded-full inline-block font-semibold hover:bg-red-600 transition-colors">
+                Donate Blood
+              </div>
+            </motion.div>
+
+            {/* Requester Card */}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              className="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-2xl shadow-soft hover:shadow-lg transition-all cursor-pointer h-full"
+              onClick={() => handleAuthAction('/requester', 'requester')}
+            >
+              <div className="flex justify-center mb-6">
+                <Search className="w-16 h-16 text-blue-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-blue-600 mb-4">I Need Blood</h2>
+              <p className="text-gray-600 mb-6">
+                Quick and efficient blood request processing. Find donors in your area.
+              </p>
+              <div className="bg-blue-500 text-white px-6 py-3 rounded-full inline-block font-semibold hover:bg-blue-600 transition-colors">
+                Request Blood
+              </div>
             </motion.div>
           </div>
 
-          {/* Stats Section */}
-          {/* <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
-            {stats.map((stat, index) => (
-              <motion.div
-                key={index}
-                className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 text-center"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 * index }}
-              >
-                <div className="flex justify-center mb-4">{stat.icon}</div>
-                <div className="text-2xl font-bold text-gray-900 mb-2">{stat.value}</div>
-                <div className="text-gray-600">{stat.label}</div>
-              </motion.div>
-            ))} */}
-        </div>
-
-        {/* Donation Requests Section */}
-        <div className="mt-16 mx-9">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-900">Available Blood Donors</h2>
-            <Link
-              to="/finddonor"
-              className="text-red-500 hover:text-red-600 flex items-center gap-1"
+          {/* Statistics Section */}
+          <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-white p-6 rounded-xl shadow-soft text-center"
             >
-              View all <ChevronRight className="w-4 h-4" />
-            </Link>
+              <h3 className="text-3xl font-bold text-red-500 mb-2">10,000+</h3>
+              <p className="text-gray-600">Successful Donations</p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="bg-white p-6 rounded-xl shadow-soft text-center"
+            >
+              <h3 className="text-3xl font-bold text-red-500 mb-2">5,000+</h3>
+              <p className="text-gray-600">Active Donors</p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="bg-white p-6 rounded-xl shadow-soft text-center"
+            >
+              <h3 className="text-3xl font-bold text-red-500 mb-2">24/7</h3>
+              <p className="text-gray-600">Emergency Support</p>
+            </motion.div>
           </div>
-
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-red-500 border-t-transparent mx-auto"></div>
-              <p className="mt-4 text-gray-600">Loading requests...</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {donationRequests.map((request, index) => (
-                <motion.div
-                  key={index}
-                  className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => navigate(`/profile/${request.userId}`)}
-                  whileHover={{ scale: 1.02 }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 * index }}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{request.fullName}</h3>
-                      <p className="text-gray-600">{request.city}</p>
-                    </div>
-                    <div className="bg-red-50 text-red-500 px-3 py-1 rounded-full text-sm font-medium">
-                      {request.bloodGroup}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-                    <button className="text-red-500 hover:text-red-600 flex items-center gap-1">
-                      Contact <MessageCircle className="w-4 h-4" />
-                    </button>
-                    <span className="text-sm text-gray-500">Urgent</span>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
         </div>
-
-        {/* Chat Section */}
-        <div className="mt-8 text-center">
-          <Link
-            to="/donate"
-            className="inline-flex items-center gap-2 bg-red-500 text-white px-6 py-3 rounded-full hover:bg-red-600 transition-colors shadow-sm hover:shadow"
-          >
-            <MessageCircle className="w-5 h-5" />
-            Register as Donor
-          </Link>
-        </div>
-
       </div>
-      {/* Footer */}
-      <footer className="bg-surface border-t border-accent py-6 mt-16 text-center text-primary text-sm">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-2 px-4">
-          <div>
-            &copy; {new Date().getFullYear()} Flow4Life. All rights reserved.
-          </div>
-          <div className="flex gap-4">
-            <a href="mailto:support@flow4life.com" className="hover:text-accent transition">Contact</a>
-            <a href="/" className="hover:text-accent transition">Dashboard</a>
-            <a href="/finddonor" className="hover:text-accent transition">Find Donors</a>
-          </div>
-        </div>
-      </footer>
-      {/* Scroll to Top Button */}
-      {showScroll && (
-        <button
-          onClick={scrollToTop}
-          className="fixed bottom-8 right-8 bg-primary text-white p-3 rounded-full shadow-lg hover:bg-accent transition z-50"
-          aria-label="Scroll to top"
-        >
-          ↑
-        </button>
-      )}
     </>
   );
 };

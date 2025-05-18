@@ -2,7 +2,7 @@
   "name": "flow4life",
   "private": true,
   "version": "1.0.0",
-  "description": "",
+  "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@maptiler/client": "^2.2.0",
     "@maptiler/sdk": "^3.0.1",
     "@radix-ui/react-form": "^0.1.2",
@@ -21,6 +22,9 @@
     "@react-google-maps/api": "^2.20.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
     "firebase": "^11.3.1",
     "framer-motion": "^12.5.0",
     "input-otp": "^1.4.2",
@@ -28,6 +32,7 @@
     "leaflet": "^1.9.4",
     "leaflet-routing-machine": "^3.2.12",
     "lucide-react": "^0.475.0",
+    "node-fetch": "^3.3.2",
     "otp-input-react": "^0.3.0",
     "react": "^19.0.0",
     "react-bootstrap": "^2.10.9",
@@ -54,5 +59,16 @@
     "postcss": "^8.5.2",
     "tailwindcss": "^3.4.17",
     "vite": "^6.1.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yashsrivasta7a/Flow4Life.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yashsrivasta7a/Flow4Life/issues"
+  },
+  "homepage": "https://github.com/yashsrivasta7a/Flow4Life#readme"
 }
