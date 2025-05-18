@@ -15,7 +15,6 @@ const ProfileSetup = () => {
     const [user, setUser] = useState(null);
     const [bloodGroup, setBloodGroup] = useState("");
     const [location, setLocation] = useState("");
-    const [contact, setContact] = useState("");
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
@@ -42,7 +41,7 @@ const ProfileSetup = () => {
 
         try {
             const userRef = ref(db, `users/${user.uid}`);
-            await update(userRef, { bloodGroup, location, contact });
+            await update(userRef, { bloodGroup, location });
             console.log("Profile updated!");
             navigate("/"); 
         } catch (error) {
@@ -61,7 +60,7 @@ const ProfileSetup = () => {
                 menuOpen={menuOpen}
                 setMenuOpen={setMenuOpen}
             />
-            <div className='page-container'>
+            <div className='page-container pt-20'>
                 <div className="form-container">
                     <div className="header">
                         <h1 className='app-name'>Flow4Life</h1>
@@ -74,7 +73,7 @@ const ProfileSetup = () => {
                         <div className="form-group">
                             <input
                                 type="text"
-                                placeholder='BloodGroup'
+                                placeholder='Blood Group'
                                 value={bloodGroup}
                                 onChange={(e) => setBloodGroup(e.target.value)}
                                 required
@@ -84,13 +83,6 @@ const ProfileSetup = () => {
                                 placeholder="Location"
                                 value={location}
                                 onChange={(e) => setLocation(e.target.value)}
-                                required
-                            />
-                            <input
-                                type="text"
-                                placeholder="Contact"
-                                value={contact}
-                                onChange={(e) => setContact(e.target.value)}
                                 required
                             />
                         </div>

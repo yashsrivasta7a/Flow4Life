@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { getAuth } from 'firebase/auth';
 import { getDatabase, ref, onValue, push, set, query, orderByChild, equalTo, get } from 'firebase/database';
 import { useNavigate, Link } from 'react-router-dom';
@@ -14,18 +14,60 @@ const Chat = () => {
   const database = getDatabase();
 
   const [user, setUser] = useState(null);
-  const [donors, setDonors] = useState([]);
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingTimeout, setTypingTimeout] = useState(null);
+  const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  // Handle typing indicator
+  const handleTyping = () => {
+    if (!selectedChat) return;
+    
+    const typingRef = ref(database, `userChats/${selectedChat.id}/typing/${auth.currentUser.uid}`);
+    set(typingRef, true);
+
+    // Clear previous timeout
+    if (typingTimeout) clearTimeout(typingTimeout);
+
+    // Set new timeout
+    const timeout = setTimeout(() => {
+      set(typingRef, false);
+    }, 2000);
+
+    setTypingTimeout(timeout);
+  };
+
+  // Listen for typing status
+  useEffect(() => {
+    if (!selectedChat) return;
+
+    const otherUserId = selectedChat.otherUserId;
+    const typingRef = ref(database, `userChats/${selectedChat.id}/typing/${otherUserId}`);
+    
+    const unsubscribe = onValue(typingRef, (snapshot) => {
+      setIsTyping(snapshot.val() || false);
+    });
+
+    return () => unsubscribe();
+  }, [selectedChat, database]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         setUser(user);
-        fetchDonors();
         fetchChats(user.uid);
       } else {
         navigate('/signin');
@@ -34,34 +76,21 @@ const Chat = () => {
     return () => unsubscribe();
   }, [auth, navigate]);
 
-  const fetchDonors = () => {
-    const donorsRef = ref(database, 'donation_requests');
-    onValue(donorsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const donorsList = Object.entries(data).map(([key, value]) => ({
-          id: key,
-          ...value
-        })).filter(donor => donor.userId !== auth.currentUser?.uid);
-        setDonors(donorsList);
-      }
-      setLoading(false);
-    });
-  };
-
   const fetchChats = (userId) => {
-    const userChatsRef = ref(database, `chats`);
+    const userChatsRef = ref(database, `userChats/${userId}`);
     onValue(userChatsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         const chatsList = Object.entries(data).map(([chatId, chatData]) => ({
           id: chatId,
           ...chatData
-        })).filter(chat => 
-          chat.participants && 
-          (chat.participants.includes(userId))
-        );
+        })).sort((a, b) => b.timestamp - a.timestamp); // Sort by most recent
         setChats(chatsList);
+        
+        // If no chat is selected, select the most recent one
+        if (!selectedChat && chatsList.length > 0) {
+          selectChat(chatsList[0]);
+        }
       }
       setLoading(false);
     });
@@ -105,6 +134,10 @@ const Chat = () => {
 
   const selectChat = (chat) => {
     setSelectedChat(chat);
+    // Mark chat as read
+    if (chat.unread) {
+      set(ref(database, `userChats/${auth.currentUser.uid}/${chat.id}/unread`), false);
+    }
     // Fetch messages for this chat
     const messagesRef = ref(database, `messages/${chat.id}`);
     onValue(messagesRef, (snapshot) => {
@@ -136,26 +169,29 @@ const Chat = () => {
     const newMessageRef = push(ref(database, `messages/${selectedChat.id}`));
     set(newMessageRef, messageData);
 
-    // Update the last message in the chat
-    set(ref(database, `chats/${selectedChat.id}/lastMessage`), messageData);
+    // Update both users' chat data
+    const otherUserId = selectedChat.otherUserId;
+    const updates = {};
+    updates[`userChats/${auth.currentUser.uid}/${selectedChat.id}/lastMessage`] = newMessage;
+    updates[`userChats/${auth.currentUser.uid}/${selectedChat.id}/timestamp`] = messageData.timestamp;
+    updates[`userChats/${otherUserId}/${selectedChat.id}/lastMessage`] = newMessage;
+    updates[`userChats/${otherUserId}/${selectedChat.id}/timestamp`] = messageData.timestamp;
+    updates[`userChats/${otherUserId}/${selectedChat.id}/unread`] = true;
+    
+    set(ref(database), updates);
     
     // Send notification to the other participant
-    const otherParticipantId = selectedChat.participants.find(id => id !== auth.currentUser.uid);
-    if (otherParticipantId) {
-      sendChatNotification(
-        otherParticipantId, 
-        newMessage, 
-        auth.currentUser.displayName || auth.currentUser.email.split('@')[0]
-      );
-    }
+    sendChatNotification(
+      otherUserId, 
+      newMessage, 
+      auth.currentUser.displayName || auth.currentUser.email.split('@')[0]
+    );
 
     setNewMessage('');
   };
 
   const getOtherParticipantName = (chat) => {
-    if (!chat || !chat.participantNames) return 'Unknown';
-    const otherParticipantId = chat.participants.find(id => id !== auth.currentUser?.uid);
-    return chat.participantNames[otherParticipantId] || 'Unknown';
+    return chat.otherUserName || 'Unknown';
   };
 
   return (
@@ -169,12 +205,12 @@ const Chat = () => {
       >
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(-1)}
             className="mr-4 p-2 rounded-full hover:bg-gray-100"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-2xl font-bold text-gray-900">Chats</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
         </div>
       </motion.div>
 
@@ -240,8 +276,8 @@ const Chat = () => {
             <div className="p-4 border-t border-gray-100">
               <h3 className="font-medium text-gray-900 mb-3">Available Donors</h3>
               <div className="max-h-64 overflow-y-auto">
-                {donors.length > 0 ? (
-                  donors.map((donor) => (
+                {chats.length > 0 ? (
+                  chats.map((donor) => (
                     <div
                       key={donor.id}
                       className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
@@ -280,40 +316,61 @@ const Chat = () => {
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
                   {messages.length > 0 ? (
-                    messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`flex ${
-                          message.sender === auth.currentUser?.uid
-                            ? 'justify-end'
-                            : 'justify-start'
-                        }`}
-                      >
+                    <>
+                      {messages.map((message) => (
                         <div
-                          className={`max-w-[70%] rounded-lg p-3 ${
+                          key={message.id}
+                          className={`flex ${
                             message.sender === auth.currentUser?.uid
-                              ? 'bg-red-500 text-white'
-                              : 'bg-white border border-gray-200 text-gray-800'
+                              ? 'justify-end'
+                              : 'justify-start'
                           }`}
                         >
-                          <p>{message.text}</p>
-                          <p
-                            className={`text-xs mt-1 ${
+                          <div
+                            className={`max-w-[70%] rounded-lg p-3 ${
                               message.sender === auth.currentUser?.uid
-                                ? 'text-red-100'
-                                : 'text-gray-500'
+                                ? 'bg-red-500 text-white'
+                                : 'bg-white border border-gray-200 text-gray-800'
                             }`}
                           >
-                            {new Date(message.timestamp).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
+                            <p>{message.text}</p>
+                            <div className="flex items-center justify-end gap-1 mt-1">
+                              <p
+                                className={`text-xs ${
+                                  message.sender === auth.currentUser?.uid
+                                    ? 'text-red-100'
+                                    : 'text-gray-500'
+                                }`}
+                              >
+                                {new Date(message.timestamp).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                              {message.sender === auth.currentUser?.uid && (
+                                <span className="text-xs text-red-100">
+                                  {message.read ? '✓✓' : '✓'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      ))}
+                      {isTyping && (
+                        <div className="flex justify-start">
+                          <div className="bg-gray-200 rounded-lg px-4 py-2">
+                            <div className="flex gap-1">
+                              <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></span>
+                              <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                              <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div ref={messagesEndRef} />
+                    </>
                   ) : (
                     <div className="text-center text-gray-500 py-8">
                       <MessageCircle className="w-8 h-8 mx-auto mb-2 text-gray-400" />
@@ -323,20 +380,26 @@ const Chat = () => {
                 </div>
 
                 {/* Message input */}
-                <form onSubmit={sendMessage} className="p-4 border-t border-gray-100 flex gap-2">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type a message..."
-                    className="flex-1 rounded-full border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  />
-                  <button
-                    type="submit"
-                    className="bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors"
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
+                <form onSubmit={sendMessage} className="p-4 border-t border-gray-100">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => {
+                        setNewMessage(e.target.value);
+                        handleTyping();
+                      }}
+                      placeholder="Type a message..."
+                      className="flex-1 rounded-full border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!newMessage.trim()}
+                      className="bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Send className="w-5 h-5" />
+                    </button>
+                  </div>
                 </form>
               </>
             ) : (

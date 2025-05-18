@@ -1,170 +1,400 @@
 import React, { useEffect, useState } from "react";
-import { getDatabase, ref, onValue } from "firebase/database";
-import { useNavigate } from "react-router-dom";
-import { Helix } from "ldrs/react";
-import "ldrs/react/Helix.css";
+import { getDatabase, ref, onValue, query, orderByChild, push, set, get } from "firebase/database";
+import { useNavigate, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
+import { toast } from "react-hot-toast";
+import { MessageCircle, MapPin, AlertCircle, ArrowUpDown, User } from "lucide-react";
+import { getAuth } from 'firebase/auth';
+import { sendChatNotification } from '../../Utils/Notifications';
+
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+  
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const d = R * c; // Distance in km
+  return d;
+};
+
+const deg2rad = (deg) => {
+  return deg * (Math.PI / 180);
+};
 
 const FindDonor = () => {
-  const database = getDatabase();
   const navigate = useNavigate();
-  const [donationRequests, setDonationRequests] = useState([]);
-  const [filteredRequests, setFilteredRequests] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [userCity, setUserCity] = useState("");
+  const location = useLocation();
+  const database = getDatabase();
+  const auth = getAuth();
+  const [donors, setDonors] = useState([]);
+  const [allDonors, setAllDonors] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterByCity, setFilterByCity] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterByDistance, setFilterByDistance] = useState(true);
+  const [showAllDonors, setShowAllDonors] = useState(false);
+  const [sortOrder, setSortOrder] = useState("nearest"); // "nearest" or "farthest"
+  const [userChats, setUserChats] = useState({});
+
+  const requestDetails = location.state || {};
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          try {
-            const response = await fetch(
-              `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=${"b3b3bbc277c2455fb37537202146f48e"}`
-            );
-            const data = await response.json();
-            const city =
-              data.results?.[0]?.components?.city ||
-              data.results?.[0]?.components?.town;
-            setUserCity(city || "");
-          } catch (error) {
-            console.error("Error fetching geolocation data:", error);
-            setUserCity("");
-          }
-        },
-        (error) => {
-          console.error("Geolocation error:", error);
-          setUserCity("");
-        }
-      );
-    }
-  }, []);
+    const donorsRef = ref(database, "donation_requests");
+    const donorsQuery = query(donorsRef, orderByChild("timestamp"));
 
-  useEffect(() => {
-    const donationRequestsRef = ref(database, "blood_requests");
-    onValue(donationRequestsRef, (snapshot) => {
+    onValue(donorsQuery, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const requestsArray = Object.entries(data).map(([id, details]) => ({
+        let donorsArray = Object.entries(data).map(([id, details]) => ({
           id,
           ...details,
+          distance: calculateDistance(
+            requestDetails.location?.latitude,
+            requestDetails.location?.longitude,
+            details.latitude,
+            details.longitude
+          )
         }));
-        setDonationRequests(requestsArray);
+
+        // Store all donors before filtering
+        setAllDonors(donorsArray);
+
+        // Apply filters only if not showing all donors
+        if (!showAllDonors) {
+          // Filter compatible blood types
+          donorsArray = donorsArray.filter(donor => {
+            if (!requestDetails.bloodType) return true;
+            return isBloodCompatible(requestDetails.bloodType, donor.bloodType);
+          });
+
+          // Sort by distance if location is available
+          if (filterByDistance && requestDetails.location) {
+            donorsArray.sort((a, b) => a.distance - b.distance);
+          }
+        }
+
+        setDonors(donorsArray);
       }
       setLoading(false);
     });
-  }, [database]);
+  }, [database, requestDetails, filterByDistance, showAllDonors]);
 
   useEffect(() => {
-    // Filter based on search query and optionally by city
-    const results = donationRequests.filter((request) => {
-      // First check if the blood group matches the search query
-      const bloodGroupMatches = 
-        !searchQuery || 
-        (request.bloodGroupRequired && 
-         request.bloodGroupRequired.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (auth.currentUser) {
+      // Listen for user's chats to show chat status
+      const userChatsRef = ref(database, `userChats/${auth.currentUser.uid}`);
+      const unsubscribe = onValue(userChatsRef, (snapshot) => {
+        const data = snapshot.val();
+        setUserChats(data || {});
+      });
+      return () => unsubscribe();
+    }
+  }, [auth.currentUser, database]);
+
+  const isBloodCompatible = (requestType, donorType) => {
+    const compatibility = {
+      'A+': ['A+', 'A-', 'O+', 'O-'],
+      'A-': ['A-', 'O-'],
+      'B+': ['B+', 'B-', 'O+', 'O-'],
+      'B-': ['B-', 'O-'],
+      'AB+': ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+      'AB-': ['A-', 'B-', 'AB-', 'O-'],
+      'O+': ['O+', 'O-'],
+      'O-': ['O-']
+    };
+    return compatibility[requestType]?.includes(donorType);
+  };
+
+  const handleChatClick = async (donorId, donorName) => {
+    if (!auth.currentUser) {
+      toast.error("Please sign in to chat with donors");
+      navigate('/signin');
+      return;
+    }
+
+    try {
+      // Check if chat already exists
+      const userChatsRef = ref(database, `userChats/${auth.currentUser.uid}`);
+      const userChatsSnapshot = await get(userChatsRef);
+      let existingChatId = null;
       
-      // Then check if we need to filter by city
-      const cityMatches = 
-        !filterByCity || 
-        (request.city && 
-         userCity && 
-         request.city.toLowerCase() === userCity.toLowerCase());
-      
-      // Return true if both conditions are met
-      return bloodGroupMatches && cityMatches;
+      if (userChatsSnapshot.exists()) {
+        // Look for an existing chat with this donor
+        Object.entries(userChatsSnapshot.val()).forEach(([chatId, chat]) => {
+          if (chat.otherUserId === donorId) {
+            existingChatId = chatId;
+          }
+        });
+      }
+
+      let chatId = existingChatId;
+
+      if (!existingChatId) {
+        // Create new chat if none exists
+        chatId = push(ref(database, 'chats')).key;
+        const chatData = {
+          participants: [auth.currentUser.uid, donorId],
+          participantNames: {
+            [auth.currentUser.uid]: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
+            [donorId]: donorName
+          },
+          lastMessage: {
+            text: "Chat started",
+            timestamp: Date.now(),
+            sender: auth.currentUser.uid
+          }
+        };
+        
+        // Save in main chats collection
+        await set(ref(database, `chats/${chatId}`), chatData);
+        
+        // Save in current user's chat list
+        const userChatData = {
+          otherUserId: donorId,
+          otherUserName: donorName,
+          lastMessage: "Chat started",
+          timestamp: Date.now(),
+          unread: false
+        };
+        await set(ref(database, `userChats/${auth.currentUser.uid}/${chatId}`), userChatData);
+        
+        // Save in donor's chat list
+        const donorChatData = {
+          otherUserId: auth.currentUser.uid,
+          otherUserName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
+          lastMessage: "Chat started",
+          timestamp: Date.now(),
+          unread: true
+        };
+        await set(ref(database, `userChats/${donorId}/${chatId}`), donorChatData);
+        
+        // Send notification to the donor
+        await sendChatNotification(
+          donorId,
+          "A new chat has been started with you",
+          auth.currentUser.displayName || auth.currentUser.email.split('@')[0]
+        );
+
+        toast.success("Chat started successfully");
+      }
+
+      // Navigate to chats page
+      navigate('/chats');
+    } catch (error) {
+      console.error("Error handling chat:", error);
+      toast.error("Failed to start chat. Please try again.");
+    }
+  };
+
+  const handleViewProfile = (donorId) => {
+    navigate(`/profile/${donorId}`);
+  };
+
+  const handleSortChange = () => {
+    setSortOrder(sortOrder === "nearest" ? "farthest" : "nearest");
+    const sortedDonors = [...donors].sort((a, b) => {
+      if (sortOrder === "nearest") {
+        return b.distance - a.distance; // Switch to farthest first
+      } else {
+        return a.distance - b.distance; // Switch to nearest first
+      }
     });
-    
-    console.log("Filtering results:", {
-      totalRequests: donationRequests.length,
-      filteredResults: results.length,
-      filterByCity,
-      userCity
-    });
-    
-    setFilteredRequests(results);
-  }, [searchQuery, donationRequests, userCity, filterByCity]);
+    setDonors(sortedDonors);
+  };
+
+  const getChatPreview = (donorId) => {
+    if (!userChats) return null;
+    const chat = Object.entries(userChats).find(([_, chatData]) => chatData.otherUserId === donorId);
+    return chat ? chat[1] : null;
+  };
+
+  const filteredDonors = showAllDonors ? allDonors : donors.filter(donor => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      donor.name?.toLowerCase().includes(searchLower) ||
+      donor.bloodType?.toLowerCase().includes(searchLower) ||
+      donor.city?.toLowerCase().includes(searchLower)
+    );
+  });
 
   return (
-    <section className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Navigation */}
-        <nav className="flex justify-between items-center bg-red-600 text-white p-4 rounded-xl shadow-md">
-          <h1 className="text-3xl font-bold">Find Donors</h1>
+        {/* Header */}
+        <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-md mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Available Donors</h1>
+            {requestDetails.isEmergency && (
+              <div className="flex items-center text-red-600 mt-2">
+                <AlertCircle className="w-5 h-5 mr-2" />
+                <span>Emergency Request</span>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => navigate("/chats")}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <MessageCircle className="w-5 h-5" />
+              <span>My Chats</span>
+            </button>
           <button
             onClick={() => navigate("/")}
-            className="bg-white text-red-600 px-4 py-2 rounded-md"
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
           >
             Home
           </button>
-        </nav>
+          </div>
+        </div>
 
-        {/* Search and Filter Options */}
-        <div className="mt-6 flex flex-col md:flex-row gap-4 items-center justify-center">
+        {/* Filters */}
+        <div className="bg-white p-6 rounded-xl shadow-md mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
           <input
             type="text"
-            placeholder="Search by Blood Group..."
-            className="p-3 w-full md:w-1/2 border border-gray-300 rounded-md shadow-sm"
+              placeholder="Search by name, blood type, or city..."
+              className="flex-1 px-4 py-2 border rounded-lg"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          
-          {/* <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              id="cityFilter"
-              checked={filterByCity}
-              onChange={() => setFilterByCity(!filterByCity)}
-              className="h-4 w-4 text-red-600 border-gray-300 rounded"
-            />
-            <label htmlFor="cityFilter" className="text-gray-700">
-              Show only in my city {userCity ? `(${userCity})` : ""}
-            </label>
-          </div> */}
+                  id="distanceFilter"
+                  checked={filterByDistance}
+                  onChange={(e) => setFilterByDistance(e.target.checked)}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <label htmlFor="distanceFilter">Sort by distance</label>
+              </div>
+              {filterByDistance && (
+                <button
+                  onClick={handleSortChange}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <ArrowUpDown className="w-4 h-4" />
+                  <span>{sortOrder === "nearest" ? "Nearest First" : "Farthest First"}</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Donor List */}
-        <div className="mt-6 flex flex-wrap justify-center gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading ? (
-            <div className="w-full flex justify-center items-center min-h-[200px]">
-              <Helix size={65} speed={2.5} color="red" />
+            <div className="col-span-full flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
             </div>
-          ) : filteredRequests.length > 0 ? (
-            filteredRequests.map((request) => (
-              <div
-                key={request.id}
-                className="p-6 bg-white shadow-md rounded-lg hover:shadow-lg transition cursor-pointer w-full sm:w-[45%] md:w-[30%]"
-                onClick={() => navigate(`/chats`)}
-              >
-                <h3 className="text-lg font-bold text-gray-800">
-                  {request.fullName}
-                </h3>
-                <p className="text-red-600 font-semibold">
-                  Blood Group: {request.bloodGroupRequired}
-                </p>
-                <p className="text-gray-500">City: {request.city || "Not specified"}</p>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/chats`);
-                  }}
-                  className="mt-2 bg-red-600 text-white px-4 py-2 rounded-md"
+          ) : filteredDonors.length > 0 ? (
+            filteredDonors.map((donor) => {
+              const chatPreview = getChatPreview(donor.userId);
+              return (
+                <motion.div
+                  key={donor.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow"
                 >
-                  Chat with Donor
-                </button>
-              </div>
-            ))
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      <div 
+                        className="flex items-center gap-2 cursor-pointer"
+                        onClick={() => handleViewProfile(donor.userId)}
+                      >
+                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                          <User className="w-6 h-6 text-gray-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-800 hover:text-red-600">
+                            {donor.name}
+                </h3>
+                          <span className="inline-block bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm font-medium">
+                            {donor.bloodType}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleChatClick(donor.userId, donor.name)}
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-800 px-3 py-1 rounded-lg hover:bg-blue-50 relative"
+                    >
+                      <MessageCircle className="w-5 h-5" />
+                      <span>Chat</span>
+                      {chatPreview?.unread && (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+                      )}
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex items-center">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      <span>{donor.city}</span>
+                    </div>
+                    {donor.distance !== Infinity && (
+                      <div className="text-sm text-gray-500">
+                        Distance: {donor.distance.toFixed(1)} km
+                      </div>
+                    )}
+                    <div>Last Donation: {donor.lastDonation ? new Date(donor.lastDonation).toLocaleDateString() : 'Not specified'}</div>
+                    {chatPreview && (
+                      <div className="mt-3 p-2 bg-gray-50 rounded-lg">
+                        <p className="text-xs text-gray-500">Last message:</p>
+                        <p className="text-sm text-gray-700 truncate">{chatPreview.lastMessage}</p>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleViewProfile(donor.userId)}
+                    className="mt-4 w-full text-gray-600 hover:text-red-600 text-sm font-medium flex items-center justify-center gap-2 py-2 border border-gray-200 rounded-lg hover:border-red-200 transition-colors"
+                  >
+                    <User className="w-4 h-4" />
+                    View Full Profile
+                  </button>
+                </motion.div>
+              );
+            })
           ) : (
-            <div className="w-full text-center py-10">
-              <p className="text-gray-600 text-lg">
-                No donation requests found matching your criteria.
+            <div className="col-span-full text-center py-12">
+              <p className="text-gray-600 text-lg mb-4">
+                No donors found matching your criteria.
               </p>
+              {!showAllDonors && (
+                <button
+                  onClick={() => {
+                    setShowAllDonors(true);
+                    setSearchQuery("");
+                  }}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Show All Donors
+                </button>
+              )}
             </div>
           )}
         </div>
+        {showAllDonors && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => {
+                setShowAllDonors(false);
+                setSearchQuery("");
+              }}
+              className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Reset Filters
+            </button>
+          </div>
+        )}
       </div>
-    </section>
+    </div>
   );
 };
 
