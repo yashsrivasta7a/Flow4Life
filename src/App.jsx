@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Signuppage from './Pages/signup/Signuppage';
 import Signinpage from './Pages/signin/Signinpage';
 import Home from './Pages/Home/Home';
@@ -19,7 +19,139 @@ import { AnimatePresence } from 'framer-motion';
 import BloodRequests from './Pages/BloodRequests/BloodRequests';
 import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/ProtectedRoute';
+import Chatbot from './components/Chatbot';
 
+function AppContent() {
+  const location = useLocation();
+
+  // Add any routes you want to exclude the chatbot from
+  const hideChatbotRoutes = ['/signin', '/signup'];
+  const shouldShowChatbot = !hideChatbotRoutes.includes(location.pathname);
+
+  return (
+    <>
+      <Toaster position="top-center" />
+      <div className="min-h-screen w-full bg-gradient-to-b from-background to-surface">
+        <NotificationCenter />
+        <div className="w-full">
+          <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
+              {/* Public Routes */}
+              <Route path="/" element={<Home />} />
+              <Route path="/signin" element={<Signinpage />} />
+              <Route path="/signup" element={<Signuppage />} />
+              <Route path="/learn-more" element={<LearnMore />} />
+              <Route path="/chatbot" element={<Chatbot />} />
+
+              {/* Protected Routes */}
+              <Route
+                path="/donor"
+                element={
+                  <ProtectedRoute>
+                    <DonorHome />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/requester"
+                element={
+                  <ProtectedRoute>
+                    <RequesterHome />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/donation-form"
+                element={
+                  <ProtectedRoute>
+                    <BloodDonationForm />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/request-form"
+                element={
+                  <ProtectedRoute>
+                    <RequestForm />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/emergency"
+                element={
+                  <ProtectedRoute>
+                    <RequestForm emergency={true} />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/finddonor"
+                element={
+                  <ProtectedRoute>
+                    <FindDonor />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/blood-requests"
+                element={
+                  <ProtectedRoute>
+                    <BloodRequests />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile/:userId"
+                element={
+                  <ProtectedRoute>
+                    <UserProfile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profilesetup"
+                element={
+                  <ProtectedRoute>
+                    <ProfileSetup />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/chats"
+                element={
+                  <ProtectedRoute>
+                    <Chat />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/chat/:userId"
+                element={
+                  <ProtectedRoute>
+                    <ChatWithUser />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/chat-list"
+                element={
+                  <ProtectedRoute>
+                    <ChatList />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </AnimatePresence>
+
+          {/* Floating Chatbot visible globally (except excluded routes) */}
+          {shouldShowChatbot && <Chatbot />}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// App wrapper for Router
 function App() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker
@@ -34,83 +166,7 @@ function App() {
 
   return (
     <Router>
-      <Toaster position="top-center" />
-      <div className="min-h-screen w-full bg-gradient-to-b from-background to-surface">
-        <NotificationCenter />
-        <div className="w-full">
-          <AnimatePresence mode="wait">
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<Home />} />
-              <Route path="/signin" element={<Signinpage />} />
-              <Route path="/signup" element={<Signuppage />} />
-              <Route path="/learn-more" element={<LearnMore />} />
-
-              {/* Protected Routes */}
-              <Route path="/donor" element={
-                <ProtectedRoute>
-                  <DonorHome />
-                </ProtectedRoute>
-              } />
-              <Route path="/requester" element={
-                <ProtectedRoute>
-                  <RequesterHome />
-                </ProtectedRoute>
-              } />
-              <Route path="/donation-form" element={
-                <ProtectedRoute>
-                  <BloodDonationForm />
-                </ProtectedRoute>
-              } />
-              <Route path="/request-form" element={
-                <ProtectedRoute>
-                  <RequestForm />
-                </ProtectedRoute>
-              } />
-              <Route path="/emergency" element={
-                <ProtectedRoute>
-                  <RequestForm emergency={true} />
-                </ProtectedRoute>
-              } />
-              <Route path="/finddonor" element={
-                <ProtectedRoute>
-                  <FindDonor />
-                </ProtectedRoute>
-              } />
-              <Route path="/blood-requests" element={
-                <ProtectedRoute>
-                  <BloodRequests />
-                </ProtectedRoute>
-              } />
-              <Route path="/profile/:userId" element={
-                <ProtectedRoute>
-                  <UserProfile />
-                </ProtectedRoute>
-              } />
-              <Route path="/profilesetup" element={
-                <ProtectedRoute>
-                  <ProfileSetup />
-                </ProtectedRoute>
-              } />
-              <Route path="/chats" element={
-                <ProtectedRoute>
-                  <Chat />
-                </ProtectedRoute>
-              } />
-              <Route path="/chat/:userId" element={
-                <ProtectedRoute>
-                  <ChatWithUser />
-                </ProtectedRoute>
-              } />
-              <Route path="/chat-list" element={
-                <ProtectedRoute>
-                  <ChatList />
-                </ProtectedRoute>
-              } />
-            </Routes>
-          </AnimatePresence>
-        </div>
-      </div>
+      <AppContent />
     </Router>
   );
 }
