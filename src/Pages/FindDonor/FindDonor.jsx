@@ -6,6 +6,7 @@ import { toast } from "react-hot-toast";
 import { MessageCircle, MapPin, AlertCircle, ArrowUpDown, User } from "lucide-react";
 import { getAuth } from 'firebase/auth';
 import { sendChatNotification } from '../../Utils/Notifications';
+import { getCityFromCoordinates } from '../../Utils/Geocoding';
 
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
   if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
@@ -35,12 +36,52 @@ const FindDonor = () => {
   const [allDonors, setAllDonors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterByDistance, setFilterByDistance] = useState(true);
   const [showAllDonors, setShowAllDonors] = useState(false);
-  const [sortOrder, setSortOrder] = useState("nearest"); // "nearest" or "farthest"
   const [userChats, setUserChats] = useState({});
+  const [userLocation, setUserLocation] = useState(null);
+  const [userCity, setUserCity] = useState(null);
 
   const requestDetails = location.state || {};
+
+  // Get user's location and city
+  useEffect(() => {
+    const getUserLocation = async () => {
+      try {
+        let position;
+        if (requestDetails.location) {
+          position = {
+            coords: {
+              latitude: requestDetails.location.latitude,
+              longitude: requestDetails.location.longitude
+            }
+          };
+        } else if (navigator.geolocation) {
+          position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject);
+          });
+        }
+
+        if (position) {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ latitude, longitude });
+
+          // Get city name using our utility function
+          const cityName = await getCityFromCoordinates(latitude, longitude);
+          if (cityName) {
+            setUserCity(cityName);
+            console.log('Detected city:', cityName); // Debug log
+          } else {
+            console.log('Could not detect city from coordinates'); // Debug log
+          }
+        }
+      } catch (error) {
+        console.error('Error getting location:', error);
+        toast.error('Unable to get your location. Distance calculations will not be available.');
+      }
+    };
+
+    getUserLocation();
+  }, [requestDetails]);
 
   useEffect(() => {
     const donorsRef = ref(database, "donation_requests");
@@ -53,14 +94,14 @@ const FindDonor = () => {
         let donorsArray = Object.entries(data).map(([id, details]) => ({
           id,
           ...details,
-          distance: calculateDistance(
-            requestDetails.location?.latitude,
-            requestDetails.location?.longitude,
+          distance: userLocation ? calculateDistance(
+            userLocation.latitude,
+            userLocation.longitude,
             details.latitude,
             details.longitude
-          ),
-          isInSameCity: details.city && requestDetails.city && 
-            details.city.toLowerCase() === requestDetails.city.toLowerCase()
+          ) : Infinity,
+          isInSameCity: details.city && userCity && 
+            details.city.toLowerCase() === userCity.toLowerCase()
         }));
 
         // Store all donors before filtering
@@ -79,19 +120,17 @@ const FindDonor = () => {
             return isBloodCompatible(requestDetails.bloodType, donor.bloodType);
           });
 
-          // Sort by location and distance if location is available
-          if (filterByDistance && requestDetails.location) {
+          // Sort by location - always prioritize same city and nearest donors
+          if (userLocation) {
             donorsArray.sort((a, b) => {
               // First, prioritize donors in the same city
               if (a.isInSameCity && !b.isInSameCity) return -1;
               if (!a.isInSameCity && b.isInSameCity) return 1;
               
-              // Then sort by distance
-              if (sortOrder === "nearest") {
-                return a.distance - b.distance;
-              } else {
-                return b.distance - a.distance;
-              }
+              // Then sort by distance (nearest first)
+              const distanceA = a.distance === Infinity ? Number.MAX_VALUE : a.distance;
+              const distanceB = b.distance === Infinity ? Number.MAX_VALUE : b.distance;
+              return distanceA - distanceB;
             });
           }
         }
@@ -100,7 +139,7 @@ const FindDonor = () => {
       }
       setLoading(false);
     });
-  }, [database, requestDetails, filterByDistance, showAllDonors, sortOrder]);
+  }, [database, requestDetails, showAllDonors, userLocation, userCity]);
 
   useEffect(() => {
     if (auth.currentUser) {
@@ -211,10 +250,6 @@ const FindDonor = () => {
 
   const handleViewProfile = (donorId) => {
     navigate(`/profile/${donorId}`);
-  };
-
-  const handleSortChange = () => {
-    setSortOrder(prevOrder => prevOrder === "nearest" ? "farthest" : "nearest");
   };
 
   const getChatPreview = (donorId) => {
@@ -373,34 +408,13 @@ const FindDonor = () => {
         {/* Filters */}
         <div className="bg-white p-6 rounded-xl shadow-md mb-6">
           <div className="flex flex-col md:flex-row gap-4">
-          <input
-            type="text"
+            <input
+              type="text"
               placeholder="Search by name, blood type, or city..."
               className="flex-1 px-4 py-2 border rounded-lg"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-                  id="distanceFilter"
-                  checked={filterByDistance}
-                  onChange={(e) => setFilterByDistance(e.target.checked)}
-                  className="w-4 h-4 text-blue-600"
-                />
-                <label htmlFor="distanceFilter">Sort by distance</label>
-              </div>
-              {filterByDistance && (
-                <button
-                  onClick={handleSortChange}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  <ArrowUpDown className="w-4 h-4" />
-                  <span>{sortOrder === "nearest" ? "Nearest First" : "Farthest First"}</span>
-                </button>
-              )}
-            </div>
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
         </div>
 
@@ -411,7 +425,126 @@ const FindDonor = () => {
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
             </div>
           ) : filteredDonors.length > 0 ? (
-            filteredDonors.map(renderDonorCard)
+            <motion.div
+              layout
+              className="col-span-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              {filteredDonors.map((donor) => (
+                <motion.div
+                  key={donor.id}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ 
+                    opacity: 1,
+                    boxShadow: requestDetails.isEmergency 
+                      ? ['0 0 0 0 rgba(220, 38, 38, 0)', '0 0 0 10px rgba(220, 38, 38, 0)']
+                      : undefined
+                  }}
+                  transition={{
+                    layout: { duration: 0.3 },
+                    opacity: { duration: 0.2 },
+                    boxShadow: {
+                      repeat: Infinity,
+                      duration: 2,
+                      ease: "easeInOut"
+                    }
+                  }}
+                  className={`${
+                    requestDetails.isEmergency 
+                      ? 'bg-red-600 text-white shadow-red-200 relative animate-pulse-subtle' 
+                      : 'bg-white text-gray-800'
+                  } p-6 rounded-xl shadow-lg hover:shadow-xl transition-all ${
+                    donor.isInSameCity ? 'border-2 border-green-500' : ''
+                  }`}
+                >
+                  {requestDetails.isEmergency && (
+                    <div className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full animate-ping" />
+                  )}
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      <div 
+                        className="flex items-center gap-2 cursor-pointer"
+                        onClick={() => handleViewProfile(donor.userId)}
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          requestDetails.isEmergency 
+                            ? 'bg-red-500 text-white' 
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          <User className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className={`text-lg font-semibold hover:opacity-80 transition-opacity ${
+                            requestDetails.isEmergency ? 'text-white' : 'text-gray-800 hover:text-red-600'
+                          }`}>
+                            {renderDonorName(donor)}
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-block px-2 py-1 rounded-full text-sm font-medium ${
+                              requestDetails.isEmergency 
+                                ? 'bg-red-500 text-white' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {donor.bloodType || "Unknown"}
+                            </span>
+                            {requestDetails.isEmergency && (
+                              <span className="inline-flex items-center px-3 py-1 bg-red-500 text-white rounded-full text-sm font-medium animate-pulse">
+                                <AlertCircle className="w-4 h-4 mr-1" />
+                                Emergency
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleChatClick(donor.userId, donor.name)}
+                      className={`flex items-center gap-2 px-3 py-1 rounded-lg relative ${
+                        requestDetails.isEmergency 
+                          ? 'text-white hover:bg-red-500' 
+                          : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
+                      }`}
+                    >
+                      <MessageCircle className="w-5 h-5" />
+                      <span>Chat</span>
+                      {getChatPreview(donor.userId)?.unread && (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-500 rounded-full"></span>
+                      )}
+                    </button>
+                  </div>
+                  
+                  <div className={`space-y-2 text-sm ${
+                    requestDetails.isEmergency ? 'text-red-100' : 'text-gray-600'
+                  }`}>
+                    {renderLocationInfo(donor)}
+                    <div>Last Donation: {donor.lastDonation ? new Date(donor.lastDonation).toLocaleDateString() : 'Not specified'}</div>
+                    {getChatPreview(donor.userId) && (
+                      <div className={`mt-3 p-2 rounded-lg ${
+                        requestDetails.isEmergency 
+                          ? 'bg-red-500 bg-opacity-50' 
+                          : 'bg-gray-50'
+                      }`}>
+                        <p className={requestDetails.isEmergency ? 'text-red-100' : 'text-gray-500'}>Last message:</p>
+                        <p className={requestDetails.isEmergency ? 'text-white' : 'text-gray-700'} style={{ wordBreak: 'break-word' }}>
+                          {getChatPreview(donor.userId).lastMessage}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleViewProfile(donor.userId)}
+                    className={`mt-4 w-full font-medium flex items-center justify-center gap-2 py-2 rounded-lg transition-colors ${
+                      requestDetails.isEmergency 
+                        ? 'border border-white text-white hover:bg-red-500' 
+                        : 'text-gray-600 hover:text-red-600 border border-gray-200 hover:border-red-200'
+                    }`}
+                  >
+                    <User className="w-4 h-4" />
+                    View Full Profile
+                  </button>
+                </motion.div>
+              ))}
+            </motion.div>
           ) : (
             <div className="col-span-full text-center py-12">
               <p className="text-gray-600 text-lg mb-4">
