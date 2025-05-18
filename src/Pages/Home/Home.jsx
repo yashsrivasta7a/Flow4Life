@@ -14,7 +14,7 @@ const Home = () => {
         >
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
             Welcome to
-            <span className="text-purple-600"> Flow4Life</span>
+            <span className="text-[#EF4444]"> Flow4Life</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 mx-auto max-w-3xl">
             Connecting blood donors with those in need. Every donation counts, every life matters.
@@ -69,7 +69,7 @@ const Home = () => {
             transition={{ delay: 0.2 }}
             className="bg-white p-6 rounded-xl shadow-soft text-center"
           >
-            <h3 className="text-3xl font-bold text-purple-600 mb-2">10,000+</h3>
+            <h3 className="text-3xl font-bold text-[#EF4444] mb-2">10,000+</h3>
             <p className="text-gray-600">Successful Donations</p>
           </motion.div>
           <motion.div
@@ -78,7 +78,7 @@ const Home = () => {
             transition={{ delay: 0.4 }}
             className="bg-white p-6 rounded-xl shadow-soft text-center"
           >
-            <h3 className="text-3xl font-bold text-purple-600 mb-2">5,000+</h3>
+            <h3 className="text-3xl font-bold text-[#EF4444] mb-2">5,000+</h3>
             <p className="text-gray-600">Active Donors</p>
           </motion.div>
           <motion.div
@@ -87,7 +87,7 @@ const Home = () => {
             transition={{ delay: 0.6 }}
             className="bg-white p-6 rounded-xl shadow-soft text-center"
           >
-            <h3 className="text-3xl font-bold text-purple-600 mb-2">24/7</h3>
+            <h3 className="text-3xl font-bold text-[#EF4444] mb-2">24/7</h3>
             <p className="text-gray-600">Emergency Support</p>
           </motion.div>
         </div>
