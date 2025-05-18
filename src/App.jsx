@@ -13,8 +13,8 @@ import UserProfile from './Pages/UserProfile/UserProfile';
 import ProfileSetup from './Pages/ProfileSetup/ProfileSetup';
 import Chat from './components/Chat';
 import NotificationCenter from './components/NotificationCenter';
-import ChatWithUser from './Pages/ChatWithUser/ChatWithUser';
-import ChatList from './Pages/ChatList/ChatList';
+// import ChatWithUser from './Pages/ChatWithUser/ChatWithUser';
+// import ChatList from './Pages/ChatList/ChatList';
 import { AnimatePresence } from 'framer-motion';
 import BloodRequests from './Pages/BloodRequests/BloodRequests';
 import { Toaster } from 'react-hot-toast';
@@ -124,7 +124,7 @@ function AppContent() {
                   </ProtectedRoute>
                 }
               />
-              <Route
+              {/* <Route
                 path="/chat/:userId"
                 element={
                   <ProtectedRoute>
@@ -139,7 +139,7 @@ function AppContent() {
                     <ChatList />
                   </ProtectedRoute>
                 }
-              />
+              /> */}
             </Routes>
           </AnimatePresence>
 
