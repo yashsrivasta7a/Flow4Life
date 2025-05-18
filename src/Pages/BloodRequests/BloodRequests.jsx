@@ -90,67 +90,62 @@ const BloodRequests = () => {
       return;
     }
 
-    // Don't allow chat with self
-    if (requesterId === auth.currentUser.uid) {
-      toast.error("You cannot chat with yourself");
-      return;
-    }
-
     try {
-      // First check if the requester exists
-      const requesterRef = ref(database, `users/${requesterId}`);
-      const requesterSnapshot = await get(requesterRef);
+      // Check if chat already exists
+      const userChatsRef = ref(database, `userChats/${auth.currentUser.uid}`);
+      const userChatsSnapshot = await get(userChatsRef);
+      let existingChatId = null;
       
-      if (!requesterSnapshot.exists()) {
-        toast.error("Could not find the requester's profile");
-        return;
+      if (userChatsSnapshot.exists()) {
+        // Look for an existing chat with this requester
+        Object.entries(userChatsSnapshot.val()).forEach(([chatId, chat]) => {
+          if (chat.otherUserId === requesterId) {
+            existingChatId = chatId;
+          }
+        });
       }
 
-      // Generate a unique chat ID that will be the same for both users
-      const chatId = [auth.currentUser.uid, requesterId].sort().join('_');
+      let chatId = existingChatId;
 
-      // Check if chat already exists
-      const chatRef = ref(database, `chats/${chatId}`);
-      const chatSnapshot = await get(chatRef);
-
-      if (!chatSnapshot.exists()) {
-        // Create new chat
+      if (!existingChatId) {
+        // Create new chat if none exists
+        chatId = push(ref(database, 'chats')).key;
         const chatData = {
           participants: [auth.currentUser.uid, requesterId],
           participantNames: {
             [auth.currentUser.uid]: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
             [requesterId]: requesterName
           },
-          createdAt: Date.now(),
           lastMessage: {
             text: "Chat started",
             timestamp: Date.now(),
             sender: auth.currentUser.uid
           }
         };
-
-        // Create chat entries for both users simultaneously
-        const updates = {
-          [`chats/${chatId}`]: chatData,
-          [`userChats/${auth.currentUser.uid}/${chatId}`]: {
-            otherUserId: requesterId,
-            otherUserName: requesterName,
-            lastMessage: "Chat started",
-            timestamp: Date.now(),
-            unread: false
-          },
-          [`userChats/${requesterId}/${chatId}`]: {
-            otherUserId: auth.currentUser.uid,
-            otherUserName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
-            lastMessage: "Chat started",
-            timestamp: Date.now(),
-            unread: true
-          }
+        
+        // Save in main chats collection
+        await set(ref(database, `chats/${chatId}`), chatData);
+        
+        // Save in current user's chat list
+        const userChatData = {
+          otherUserId: requesterId,
+          otherUserName: requesterName,
+          lastMessage: "Chat started",
+          timestamp: Date.now(),
+          unread: false
         };
-
-        // Use update to write to multiple paths atomically
-        await set(ref(database), updates);
-
+        await set(ref(database, `userChats/${auth.currentUser.uid}/${chatId}`), userChatData);
+        
+        // Save in requester's chat list
+        const requesterChatData = {
+          otherUserId: auth.currentUser.uid,
+          otherUserName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
+          lastMessage: "Chat started",
+          timestamp: Date.now(),
+          unread: true
+        };
+        await set(ref(database, `userChats/${requesterId}/${chatId}`), requesterChatData);
+        
         // Send notification to the requester
         await sendChatNotification(
           requesterId,
@@ -165,11 +160,7 @@ const BloodRequests = () => {
       navigate('/chats');
     } catch (error) {
       console.error("Error handling chat:", error);
-      if (error.code === 'PERMISSION_DENIED') {
-        toast.error("You don't have permission to start this chat. Please try again later.");
-      } else {
-        toast.error("Failed to start chat. Please try again.");
-      }
+      toast.error("Failed to start chat. Please try again.");
     }
   };
 
@@ -233,40 +224,56 @@ const BloodRequests = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-white p-6 rounded-xl shadow-md mb-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">Blood Requests</h1>
-              <p className="text-gray-600 mt-1">Help save lives by donating blood</p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-r from-red-600 to-red-800 text-white py-8">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-4xl font-bold mb-2">
+                Blood Requests
+              </h1>
+              <p className="text-lg text-red-100 mb-4">
+                Help save lives by donating blood to those in need
+              </p>
             </div>
-            <button
-              onClick={() => navigate('/')}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
-            >
-              Home
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => navigate("/")}
+                className="bg-white text-red-600 px-5 py-2 rounded-xl hover:bg-red-50 transition-all transform hover:scale-105"
+              >
+                Home
+              </button>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Search */}
-        <div className="bg-white p-6 rounded-xl shadow-md mb-6">
-          <input
-            type="text"
-            placeholder="Search by patient name, blood type, hospital, or city..."
-            className="w-full px-4 py-2 border rounded-lg"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Search Section */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 transform transition-all hover:shadow-xl">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search by patient name, blood type, hospital, or city..."
+              className="w-full px-5 py-4 pr-12 text-lg border-2 border-gray-100 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
         </div>
 
         {/* Requests List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loading ? (
-            <div className="col-span-full flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-red-500 border-t-transparent"></div>
+            <div className="col-span-full flex flex-col items-center justify-center py-16">
+              <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-gray-600 text-lg">Finding blood requests...</p>
             </div>
           ) : filteredRequests.length > 0 ? (
             filteredRequests.map((request) => (
@@ -274,23 +281,24 @@ const BloodRequests = () => {
                 key={request.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow ${
-                  request.urgency === 'emergency' ? 'border-2 border-red-500' : ''
+                whileHover={{ y: -5 }}
+                className={`bg-white p-6 rounded-2xl shadow-md transition-all ${
+                  request.urgency === 'emergency' ? 'ring-2 ring-red-500 ring-offset-2' : ''
                 }`}
               >
                 {/* Header with Patient Name and Chat Button */}
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex justify-between items-start mb-6">
                   <div className="flex-1">
                     <h3 className="text-xl font-semibold text-gray-800 mb-2">
                       {request.patientName}
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       {/* Blood Type Badge */}
-                      <span className="inline-flex items-center px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
+                      <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-100">
                         {request.bloodType}
                       </span>
                       {/* Urgency Badge */}
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${getUrgencyColor(request.urgency)}`}>
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-medium ${getUrgencyColor(request.urgency)}`}>
                         {getUrgencyIcon(request.urgency)}
                         {request.urgency.charAt(0).toUpperCase() + request.urgency.slice(1)}
                       </span>
@@ -299,9 +307,10 @@ const BloodRequests = () => {
                   {auth.currentUser && request.userId !== auth.currentUser.uid && (
                     <button
                       onClick={() => handleChatClick(request.userId, request.patientName)}
-                      className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors"
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 px-4 py-2 rounded-xl hover:bg-blue-50 transition-all relative group"
                     >
-                      <MessageCircle className="w-6 h-6" />
+                      <MessageCircle className="w-5 h-5 transform group-hover:scale-110 transition-transform" />
+                      <span>Chat</span>
                     </button>
                   )}
                 </div>
@@ -309,13 +318,16 @@ const BloodRequests = () => {
                 {/* Request Details */}
                 <div className="space-y-3 text-sm">
                   {/* Hospital and Location */}
-                  <div className="flex items-start gap-2 bg-gray-50 p-3 rounded-lg">
+                  <div className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
                     <MapPin className="w-5 h-5 text-gray-500 mt-0.5" />
                     <div>
                       <div className="font-medium text-gray-800">{request.hospital}</div>
                       <div className="text-gray-600">{request.city}</div>
                       {request.distance && (
-                        <div className="text-gray-500 mt-1">
+                        <div className="text-gray-500 mt-1 flex items-center gap-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                          </svg>
                           {request.distance.toFixed(1)} km away
                         </div>
                       )}
@@ -345,18 +357,23 @@ const BloodRequests = () => {
 
                   {/* Additional Info */}
                   {request.additionalInfo && (
-                    <div className="bg-blue-50 p-3 rounded-lg text-blue-800">
-                      <div className="font-medium mb-1">Additional Information</div>
-                      <p className="text-blue-700">{request.additionalInfo}</p>
+                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                      <div className="font-medium mb-1 text-blue-700">Additional Information</div>
+                      <p className="text-blue-800">{request.additionalInfo}</p>
                     </div>
                   )}
                 </div>
               </motion.div>
             ))
           ) : (
-            <div className="col-span-full text-center py-12">
+            <div className="col-span-full flex flex-col items-center justify-center py-16 bg-white rounded-2xl shadow-lg">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
               <p className="text-gray-600 text-lg">
-                No blood requests found matching your criteria.
+                No blood requests found matching your criteria
               </p>
             </div>
           )}
