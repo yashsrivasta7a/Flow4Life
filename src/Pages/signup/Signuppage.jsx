@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import blood from '../../assets/blood.png'
-import { useNavigate, Link } from 'react-router-dom';
-import { getAuth, signInWithPopup, createUserWithEmailAndPassword, GoogleAuthProvider } from "firebase/auth";
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { getAuth, signInWithPopup, createUserWithEmailAndPassword, GoogleAuthProvider, updateProfile } from "firebase/auth";
 import { app } from "../../Utils/Firebase";
 import "./Signuppage.css";
 import Navbar from '../../components/Navbar';
 
 const Signuppage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const userType = location.state?.userType || 'donor'; // default to donor if not specified
+  
   const auth = getAuth(app);
   const Google = new GoogleAuthProvider();
 
@@ -15,6 +18,8 @@ const Signuppage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   const [errorUsername, setErrorUsername] = useState('');
   const [errorEmail, setErrorEmail] = useState('');
@@ -69,6 +74,8 @@ const Signuppage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setAuthError('');
+    setIsLoading(true);
 
     if (
       !errorUsername &&
@@ -82,27 +89,65 @@ const Signuppage = () => {
     ) {
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        console.log('User created:', userCredential.user);
-        navigate('/'); // Navigate to home or another page
+        
+        // Update the user's display name and custom claims
+        await updateProfile(userCredential.user, {
+          displayName: username
+        });
+
+        // Navigate based on user type
+        navigate(userType === 'donor' ? '/donor' : '/requester');
+        
       } catch (error) {
         console.error('Error creating user:', error.message);
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            setAuthError('This email is already registered. Please try signing in instead.');
+            break;
+          case 'auth/invalid-email':
+            setAuthError('Invalid email address.');
+            break;
+          case 'auth/operation-not-allowed':
+            setAuthError('Email/password accounts are not enabled. Please contact support.');
+            break;
+          case 'auth/weak-password':
+            setAuthError('Password is too weak. Please use a stronger password.');
+            break;
+          default:
+            setAuthError('An error occurred during sign up. Please try again.');
+        }
+      } finally {
+        setIsLoading(false);
       }
+    } else {
+      setIsLoading(false);
+      setAuthError('Please fix all errors before submitting.');
     }
   };
 
   const signupWithGoogle = async () => {
-      try {
-        const result = await signInWithPopup(auth, Google);
-        console.log("User signed in with Google:", result.user);
-        navigate('/');
-      } catch (error) {
-        console.error("Error signing in with Google:", error.message);
+    setAuthError('');
+    setIsLoading(true);
+    try {
+      const result = await signInWithPopup(auth, Google);
+      console.log("User signed in with Google:", result.user);
+      // Navigate based on user type
+      navigate(userType === 'donor' ? '/donor' : '/requester');
+    } catch (error) {
+      console.error("Error signing in with Google:", error.message);
+      if (error.code === 'auth/popup-closed-by-user') {
+        setAuthError('Google sign-in was cancelled. Please try again.');
+      } else {
+        setAuthError('Failed to sign in with Google. Please try again.');
       }
-    };
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <>
-      <Navbar
+      {/* <Navbar
         user={user}
         onLogout={() => {}}
         notifications={notifications}
@@ -110,7 +155,7 @@ const Signuppage = () => {
         setShowNotifications={setShowNotifications}
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
-      />
+      /> */}
       <div className='page-container'>
         <div className="form-container">
           <div className="header">
@@ -118,8 +163,15 @@ const Signuppage = () => {
             <div className='header'>
               <img src={blood} alt="Blood Donation Logo" />
             </div>
-            <h2 className='form-title'>Sign Up</h2>
+            <h2 className='form-title'>Sign Up as {userType === 'donor' ? 'Blood Donor' : 'Blood Requester'}</h2>
           </div>
+          
+          {authError && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+              <span className="block sm:inline">{authError}</span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <input
@@ -164,12 +216,26 @@ const Signuppage = () => {
               </label>
               
             </div>
-            <button type='submit' className='submitbutton'>Create account</button>
+            <button 
+              type='submit' 
+              className='submitbutton' 
+              disabled={isLoading}
+            >
+              {isLoading ? 'Creating account...' : 'Create account'}
+            </button>
           </form>
-          <button className='submitbutton2' onClick={signupWithGoogle}>Sign in with Google</button>
+          
+          <button 
+            className='submitbutton2' 
+            onClick={signupWithGoogle}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Signing in...' : 'Sign in with Google'}
+          </button>
+          
           <p className='footer-text'>
             Already Have an account?{" "}
-            <Link to="/signin">Sign In</Link> {/* Navigate to sign-in page */}
+            <Link to="/signin" state={{ userType }} className="text-blue-600 hover:text-blue-800">Sign In</Link>
           </p>
         </div>
       </div>
