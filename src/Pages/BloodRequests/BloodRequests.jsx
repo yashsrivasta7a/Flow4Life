@@ -176,11 +176,22 @@ const BloodRequests = () => {
   const getUrgencyColor = (urgency) => {
     switch (urgency) {
       case 'emergency':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-600 text-white';
       case 'urgent':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-orange-500 text-white';
       default:
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-500 text-white';
+    }
+  };
+
+  const getUrgencyIcon = (urgency) => {
+    switch (urgency) {
+      case 'emergency':
+        return <AlertCircle className="w-4 h-4" />;
+      case 'urgent':
+        return <Clock className="w-4 h-4" />;
+      default:
+        return <Clock className="w-4 h-4" />;
     }
   };
 
@@ -263,50 +274,80 @@ const BloodRequests = () => {
                 key={request.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow"
+                className={`bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow ${
+                  request.urgency === 'emergency' ? 'border-2 border-red-500' : ''
+                }`}
               >
+                {/* Header with Patient Name and Chat Button */}
                 <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800">
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-2">
                       {request.patientName}
                     </h3>
-                    <div className="flex gap-2 mt-1">
-                      <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-medium">
+                    <div className="flex flex-wrap gap-2">
+                      {/* Blood Type Badge */}
+                      <span className="inline-flex items-center px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
                         {request.bloodType}
                       </span>
-                      <span className={`inline-block px-2 py-1 rounded-full text-sm font-medium ${getUrgencyColor(request.urgency)}`}>
-                        {request.urgency}
+                      {/* Urgency Badge */}
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${getUrgencyColor(request.urgency)}`}>
+                        {getUrgencyIcon(request.urgency)}
+                        {request.urgency.charAt(0).toUpperCase() + request.urgency.slice(1)}
                       </span>
                     </div>
                   </div>
                   {auth.currentUser && request.userId !== auth.currentUser.uid && (
                     <button
                       onClick={() => handleChatClick(request.userId, request.patientName)}
-                      className="text-blue-600 hover:text-blue-800"
+                      className="text-blue-600 hover:text-blue-800 p-2 hover:bg-blue-50 rounded-full transition-colors"
                     >
                       <MessageCircle className="w-6 h-6" />
                     </button>
                   )}
                 </div>
 
-                <div className="space-y-2 text-sm text-gray-600">
-                  <div className="flex items-center">
-                    <MapPin className="w-4 h-4 mr-2" />
-                    <span>{request.hospital}, {request.city}</span>
-                  </div>
-                  {request.distance && (
-                    <div className="text-sm text-gray-500">
-                      Distance: {request.distance.toFixed(1)} km
+                {/* Request Details */}
+                <div className="space-y-3 text-sm">
+                  {/* Hospital and Location */}
+                  <div className="flex items-start gap-2 bg-gray-50 p-3 rounded-lg">
+                    <MapPin className="w-5 h-5 text-gray-500 mt-0.5" />
+                    <div>
+                      <div className="font-medium text-gray-800">{request.hospital}</div>
+                      <div className="text-gray-600">{request.city}</div>
+                      {request.distance && (
+                        <div className="text-gray-500 mt-1">
+                          {request.distance.toFixed(1)} km away
+                        </div>
+                      )}
                     </div>
-                  )}
-                  <div className="flex items-center text-gray-500">
-                    <Clock className="w-4 h-4 mr-2" />
-                    <span>{getTimeAgo(request.timestamp)}</span>
                   </div>
-                  <div>Units Required: {request.units}</div>
+
+                  {/* Time and Units */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center gap-2 text-gray-600 mb-1">
+                        <Clock className="w-4 h-4" />
+                        <span className="font-medium">Posted</span>
+                      </div>
+                      <div className="text-gray-800">
+                        {getTimeAgo(request.timestamp)}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <div className="text-gray-600 mb-1 font-medium">
+                        Units Needed
+                      </div>
+                      <div className="text-2xl font-bold text-red-600">
+                        {request.units}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Additional Info */}
                   {request.additionalInfo && (
-                    <div className="mt-2 text-gray-700 bg-gray-50 p-2 rounded">
-                      {request.additionalInfo}
+                    <div className="bg-blue-50 p-3 rounded-lg text-blue-800">
+                      <div className="font-medium mb-1">Additional Information</div>
+                      <p className="text-blue-700">{request.additionalInfo}</p>
                     </div>
                   )}
                 </div>
