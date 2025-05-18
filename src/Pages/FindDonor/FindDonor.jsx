@@ -319,33 +319,33 @@ const FindDonor = () => {
             {info}
           </React.Fragment>
         ))}
-      </div>
+            </div>
     );
   };
 
   // Update the donor card render to use the safe name renderer
   const renderDonorCard = (donor) => {
-    const chatPreview = getChatPreview(donor.userId);
-    return (
-      <motion.div
-        key={donor.id}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+              const chatPreview = getChatPreview(donor.userId);
+              return (
+                <motion.div
+                  key={donor.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
         className={`bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow ${
           donor.isInSameCity ? 'border-2 border-green-500' : ''
         }`}
-      >
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex-1">
-            <div 
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={() => handleViewProfile(donor.userId)}
-            >
-              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                <User className="w-6 h-6 text-gray-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800 hover:text-red-600">
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      <div 
+                        className="flex items-center gap-2 cursor-pointer"
+                        onClick={() => handleViewProfile(donor.userId)}
+                      >
+                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                          <User className="w-6 h-6 text-gray-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-800 hover:text-red-600">
                   {renderDonorName(donor)}
                 </h3>
                 <div className="flex items-center gap-2">
@@ -356,45 +356,45 @@ const FindDonor = () => {
                     <span className="inline-flex items-center px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
                       <AlertCircle className="w-4 h-4 mr-1" />
                       Emergency
-                    </span>
+                          </span>
                   )}
                 </div>
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => handleChatClick(donor.userId, donor.name)}
-            className="flex items-center gap-2 text-blue-600 hover:text-blue-800 px-3 py-1 rounded-lg hover:bg-blue-50 relative"
-          >
-            <MessageCircle className="w-5 h-5" />
-            <span>Chat</span>
-            {chatPreview?.unread && (
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-            )}
-          </button>
-        </div>
-        
-        <div className="space-y-2 text-sm text-gray-600">
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleChatClick(donor.userId, donor.name)}
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-800 px-3 py-1 rounded-lg hover:bg-blue-50 relative"
+                    >
+                      <MessageCircle className="w-5 h-5" />
+                      <span>Chat</span>
+                      {chatPreview?.unread && (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+                      )}
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2 text-sm text-gray-600">
           {renderLocationInfo(donor)}
-          <div>Last Donation: {donor.lastDonation ? new Date(donor.lastDonation).toLocaleDateString() : 'Not specified'}</div>
-          {chatPreview && (
-            <div className="mt-3 p-2 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-500">Last message:</p>
+                    <div>Last Donation: {donor.lastDonation ? new Date(donor.lastDonation).toLocaleDateString() : 'Not specified'}</div>
+                    {chatPreview && (
+                      <div className="mt-3 p-2 bg-gray-50 rounded-lg">
+                        <p className="text-xs text-gray-500">Last message:</p>
               <p className="text-sm text-gray-700" style={{ wordBreak: 'break-word' }}>
                 {chatPreview.lastMessage}
               </p>
-            </div>
-          )}
-        </div>
-        <button
-          onClick={() => handleViewProfile(donor.userId)}
-          className="mt-4 w-full text-gray-600 hover:text-red-600 text-sm font-medium flex items-center justify-center gap-2 py-2 border border-gray-200 rounded-lg hover:border-red-200 transition-colors"
-        >
-          <User className="w-4 h-4" />
-          View Full Profile
-        </button>
-      </motion.div>
-    );
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleViewProfile(donor.userId)}
+                    className="mt-4 w-full text-gray-600 hover:text-red-600 text-sm font-medium flex items-center justify-center gap-2 py-2 border border-gray-200 rounded-lg hover:border-red-200 transition-colors"
+                  >
+                    <User className="w-4 h-4" />
+                    View Full Profile
+                  </button>
+                </motion.div>
+              );
   };
 
   return (

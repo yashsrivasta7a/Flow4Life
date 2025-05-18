@@ -128,7 +128,7 @@ const UserProfile = () => {
       navigate('/chats');
     } catch (error) {
       console.error("Error starting chat:", error);
-      toast.error("Failed to start chat. Please try again.");
+        toast.error("Failed to start chat. Please try again.");
     }
   };
 
@@ -224,7 +224,7 @@ const UserProfile = () => {
               <div className="mt-20">
                 {/* User Info */}
                 <div className="space-y-4">
-                  <h1 className="text-3xl font-bold text-gray-900">{userProfile.name}</h1>
+                <h1 className="text-3xl font-bold text-gray-900">{userProfile.name}</h1>
                   
                   {userProfile.email && (
                     <div className="flex items-center text-gray-600">
@@ -233,17 +233,17 @@ const UserProfile = () => {
                     </div>
                   )}
                   
-                  {userProfile.bloodType && (
+                {userProfile.bloodType && (
                     <span className="inline-flex items-center px-3 py-1 bg-red-50 text-red-700 rounded-full text-sm font-medium">
                       <Droplet className="w-4 h-4 mr-1" />
-                      {userProfile.bloodType}
-                    </span>
-                  )}
-                  
-                  {userProfile.city && (
+                    {userProfile.bloodType}
+                  </span>
+                )}
+                
+                {userProfile.city && (
                     <div className="flex items-center text-gray-600">
                       <MapPin className="w-4 h-4 mr-2" />
-                      <span>{userProfile.city}</span>
+                    <span>{userProfile.city}</span>
                     </div>
                   )}
                 </div>
@@ -314,7 +314,7 @@ const UserProfile = () => {
                 {/* Additional Info */}
                 <div className="mt-8 space-y-4 text-gray-600">
                   {userProfile.lastDonation && (
-                    <div className="flex items-center">
+                  <div className="flex items-center">
                       <Clock className="w-4 h-4 mr-2" />
                       <span>Last Donation: {new Date(userProfile.lastDonation).toLocaleDateString()}</span>
                     </div>
@@ -328,21 +328,21 @@ const UserProfile = () => {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="mt-8 space-y-4">
+                  <div className="mt-8 space-y-4">
                   {!isOwnProfile ? (
                     <>
-                      <button 
-                        onClick={handleChat}
+                    <button 
+                      onClick={handleChat}
                         className="w-full bg-red-500 text-white py-3 rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-2 shadow-sm"
-                      >
+                    >
                         <MessageCircle className="w-5 h-5" /> Start Chat
-                      </button>
-                      <button 
-                        onClick={() => navigate("/chats")}
+                    </button>
+                    <button 
+                      onClick={() => navigate("/chats")}
                         className="w-full bg-gray-100 text-gray-700 py-3 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-                      >
+                    >
                         <MessageCircle className="w-5 h-5" /> View All Chats
-                      </button>
+                    </button>
                     </>
                   ) : (
                     <button 
@@ -352,7 +352,7 @@ const UserProfile = () => {
                       <User className="w-5 h-5" /> Edit Profile
                     </button>
                   )}
-                </div>
+                  </div>
               </div>
             </div>
           </motion.div>

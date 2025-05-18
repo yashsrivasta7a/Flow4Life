@@ -17,7 +17,7 @@ const Chatbot = () => {
       console.error('Gemini API key not found in environment variables');
     }
   }, [apiKey]);
-
+  
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);

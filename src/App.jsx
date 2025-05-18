@@ -17,6 +17,7 @@ import NotificationCenter from './components/NotificationCenter';
 // import ChatList from './Pages/ChatList/ChatList';
 import { AnimatePresence } from 'framer-motion';
 import BloodRequests from './Pages/BloodRequests/BloodRequests';
+import RequestChats from './Pages/BloodRequests/RequestChats';
 import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import Chatbot from './components/Chatbot';
@@ -97,6 +98,14 @@ function AppContent() {
                 element={
                   <ProtectedRoute>
                     <BloodRequests />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/request-chats"
+                element={
+                  <ProtectedRoute>
+                    <RequestChats />
                   </ProtectedRoute>
                 }
               />
