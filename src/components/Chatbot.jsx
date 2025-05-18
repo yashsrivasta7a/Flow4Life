@@ -11,7 +11,7 @@ const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
-  const apiKey = "AIzaSyAxCaUGVn_CUtOFH2EgHyD5LglTpD-K7oY"; // Replace with your actual API key
+  const apiKey = "AIzaSyAxCaUGVn_CUtOFH2EgHyD5LglTpD-K7oY"; // **Replace with your actual API key**
 
   useEffect(() => {
     if (!apiKey) {
