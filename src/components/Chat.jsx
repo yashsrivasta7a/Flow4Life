@@ -19,6 +19,8 @@ const Chat = () => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [donorsLoading, setDonorsLoading] = useState(true);
+  const [donors, setDonors] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState(null);
   const messagesEndRef = useRef(null);
@@ -69,6 +71,7 @@ const Chat = () => {
       if (user) {
         setUser(user);
         fetchChats(user.uid);
+        fetchDonors(user.uid);
       } else {
         navigate('/signin');
       }
@@ -84,7 +87,8 @@ const Chat = () => {
         const chatsList = Object.entries(data).map(([chatId, chatData]) => ({
           id: chatId,
           ...chatData
-        })).sort((a, b) => b.timestamp - a.timestamp); // Sort by most recent
+        })).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); // Sort by most recent
+        
         setChats(chatsList);
         
         // If no chat is selected, select the most recent one
@@ -96,48 +100,148 @@ const Chat = () => {
     });
   };
 
-  const startNewChat = (donorId, donorName) => {
-    const chatId = push(ref(database, 'chats')).key;
-    const chatData = {
-      participants: [auth.currentUser.uid, donorId],
-      participantNames: {
-        [auth.currentUser.uid]: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
-        [donorId]: donorName
-      },
-      lastMessage: {
-        text: "Chat started",
-        timestamp: Date.now(),
-        sender: auth.currentUser.uid
-      }
-    };
+  // New function to fetch donor profiles
+  const fetchDonors = (userId) => {
+    setDonorsLoading(true);
+    const donorsRef = ref(database, "donation_requests");
     
-    set(ref(database, `chats/${chatId}`), chatData)
-      .then(() => {
-        setSelectedChat({
-          id: chatId,
-          ...chatData
-        });
-        toast.success("Chat started successfully");
+    onValue(donorsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const donorsList = Object.entries(data)
+          .filter(([_, donorData]) => donorData.userId !== userId) // Filter out current user
+          .map(([id, donorData]) => ({
+            id,
+            userId: donorData.userId,
+            name: donorData.name || "Unknown",
+            bloodGroup: donorData.bloodType || "Unknown"
+          }));
         
-        // Send notification to the donor that a new chat has been initiated
-        sendChatNotification(
-          donorId,
-          "A new chat has been started with you",
-          auth.currentUser.displayName || auth.currentUser.email.split('@')[0]
-        );
-      })
-      .catch((error) => {
-        toast.error("Failed to start chat");
-        console.error("Error starting chat:", error);
+        setDonors(donorsList);
+      }
+      setDonorsLoading(false);
+    });
+  };
+
+  const startNewChat = async (donorId, donorName) => {
+    if (!donorId || !donorName) {
+      toast.error("Invalid donor information");
+      return;
+    }
+
+    try {
+      // Check if chat already exists first
+      const userChatsRef = ref(database, `userChats/${auth.currentUser.uid}`);
+      const userChatsSnapshot = await get(userChatsRef);
+      let existingChatId = null;
+      
+      if (userChatsSnapshot.exists()) {
+        // Look through existing chats to find a match
+        Object.entries(userChatsSnapshot.val()).forEach(([chatId, chat]) => {
+          if (chat.otherUserId === donorId) {
+            existingChatId = chatId;
+          }
+        });
+      }
+
+      // If chat already exists, just select it
+      if (existingChatId) {
+        const existingChat = chats.find(chat => chat.id === existingChatId);
+        if (existingChat) {
+          selectChat(existingChat);
+          return;
+        }
+      }
+
+      // Create a new chat
+      const chatId = push(ref(database, 'chats')).key;
+      const chatData = {
+        participants: [auth.currentUser.uid, donorId],
+        participantNames: {
+          [auth.currentUser.uid]: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
+          [donorId]: donorName
+        },
+        createdAt: Date.now(),
+        lastMessage: {
+          text: "Chat started",
+          timestamp: Date.now(),
+          sender: auth.currentUser.uid
+        }
+      };
+      
+      // Store the chat in the chats collection
+      await set(ref(database, `chats/${chatId}`), chatData);
+      
+      // Create entries in both users' chat lists
+      const currentUserChatData = {
+        otherUserId: donorId,
+        otherUserName: donorName,
+        lastMessage: "Chat started",
+        timestamp: Date.now(),
+        unread: false
+      };
+      
+      const donorChatData = {
+        otherUserId: auth.currentUser.uid,
+        otherUserName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
+        lastMessage: "Chat started",
+        timestamp: Date.now(),
+        unread: true
+      };
+      
+      // Update both references
+      await set(ref(database, `userChats/${auth.currentUser.uid}/${chatId}`), currentUserChatData);
+      await set(ref(database, `userChats/${donorId}/${chatId}`), donorChatData);
+      
+      // Add first message to the chat
+      const newMessageRef = push(ref(database, `messages/${chatId}`));
+      await set(newMessageRef, {
+        text: "Chat started",
+        sender: auth.currentUser.uid,
+        senderName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
+        timestamp: Date.now()
       });
+      
+      // Send notification to the donor
+      await sendChatNotification(
+        donorId,
+        "A new chat has been started with you",
+        auth.currentUser.displayName || auth.currentUser.email.split('@')[0]
+      );
+
+      // Create a local chat object to select
+      const newChat = {
+        id: chatId,
+        otherUserId: donorId,
+        otherUserName: donorName,
+        lastMessage: "Chat started",
+        timestamp: Date.now(),
+        unread: false
+      };
+      
+      setSelectedChat(newChat);
+      setChats(prevChats => [newChat, ...prevChats]);
+      
+      toast.success("Chat started successfully");
+    } catch (error) {
+      console.error("Error starting chat:", error);
+      toast.error("Failed to start chat. Please try again.");
+    }
   };
 
   const selectChat = (chat) => {
+    if (!chat || !chat.id) {
+      console.error("Invalid chat selected:", chat);
+      return;
+    }
+    
     setSelectedChat(chat);
+    
     // Mark chat as read
     if (chat.unread) {
       set(ref(database, `userChats/${auth.currentUser.uid}/${chat.id}/unread`), false);
     }
+    
     // Fetch messages for this chat
     const messagesRef = ref(database, `messages/${chat.id}`);
     onValue(messagesRef, (snapshot) => {
@@ -171,6 +275,13 @@ const Chat = () => {
 
     // Update both users' chat data
     const otherUserId = selectedChat.otherUserId;
+    
+    if (!otherUserId) {
+      console.error("Other user ID not found in selected chat:", selectedChat);
+      toast.error("Error sending message. Recipient not found.");
+      return;
+    }
+    
     const updates = {};
     updates[`userChats/${auth.currentUser.uid}/${selectedChat.id}/lastMessage`] = newMessage;
     updates[`userChats/${auth.currentUser.uid}/${selectedChat.id}/timestamp`] = messageData.timestamp;
@@ -188,10 +299,6 @@ const Chat = () => {
     );
 
     setNewMessage('');
-  };
-
-  const getOtherParticipantName = (chat) => {
-    return chat.otherUserName || 'Unknown';
   };
 
   return (
@@ -244,21 +351,22 @@ const Chat = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-gray-900 truncate">
-                            {getOtherParticipantName(chat)}
+                            {chat.otherUserName || 'Unknown'}
                           </p>
-                          {chat.lastMessage && (
-                            <p className="text-sm text-gray-600 truncate">
-                              {chat.lastMessage.text}
-                            </p>
-                          )}
+                          <p className="text-sm text-gray-600 truncate">
+                            {chat.lastMessage || 'No messages yet'}
+                          </p>
                         </div>
-                        {chat.lastMessage && (
+                        {chat.timestamp && (
                           <div className="text-xs text-gray-500">
-                            {new Date(chat.lastMessage.timestamp).toLocaleTimeString([], {
+                            {new Date(chat.timestamp).toLocaleTimeString([], {
                               hour: '2-digit',
                               minute: '2-digit'
                             })}
                           </div>
+                        )}
+                        {chat.unread && (
+                          <span className="w-3 h-3 bg-red-500 rounded-full"></span>
                         )}
                       </div>
                     </div>
@@ -272,22 +380,26 @@ const Chat = () => {
               </div>
             )}
 
-            {/* New chat section */}
+            {/* New chat section - Fixed to show actual donors from database */}
             <div className="p-4 border-t border-gray-100">
               <h3 className="font-medium text-gray-900 mb-3">Available Donors</h3>
               <div className="max-h-64 overflow-y-auto">
-                {chats.length > 0 ? (
-                  chats.map((donor) => (
+                {donorsLoading ? (
+                  <div className="flex justify-center p-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-red-500 border-t-transparent"></div>
+                  </div>
+                ) : donors.length > 0 ? (
+                  donors.map((donor) => (
                     <div
                       key={donor.id}
                       className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
-                      onClick={() => startNewChat(donor.userId, donor.fullName)}
+                      onClick={() => startNewChat(donor.userId, donor.name)}
                     >
                       <div className="flex items-center gap-2">
                         <div className="bg-red-100 text-red-500 rounded-full px-2 py-1 text-xs font-medium">
                           {donor.bloodGroup}
                         </div>
-                        <span className="font-medium">{donor.fullName}</span>
+                        <span className="font-medium">{donor.name}</span>
                       </div>
                       <button className="text-blue-500 text-sm hover:underline">
                         Chat
@@ -311,7 +423,7 @@ const Chat = () => {
                     <User className="w-5 h-5 text-gray-600" />
                   </div>
                   <h3 className="font-semibold text-gray-900">
-                    {getOtherParticipantName(selectedChat)}
+                    {selectedChat.otherUserName || 'Unknown'}
                   </h3>
                 </div>
 
