@@ -169,7 +169,7 @@ const BloodRequests = () => {
       }
 
       // Navigate directly to the specific chat
-      navigate('/chats', { state: { activeChatId: chatId, isNewChat: !existingChatId } });
+      navigate('/request-chats', { state: { activeChatId: chatId, isNewChat: !existingChatId } });
     } catch (error) {
       console.error("Error handling chat:", error);
       toast.error("Failed to connect with requester. Please try again.");
@@ -251,7 +251,7 @@ const BloodRequests = () => {
             </div>
             <div className="flex gap-3">
               <button
-                onClick={() => navigate("/chats")}
+                onClick={() => navigate("/request-chats")}
                 className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white px-5 py-2 rounded-xl flex items-center gap-2 transition-all transform hover:scale-105"
               >
                 <MessageCircle className="w-5 h-5" />
