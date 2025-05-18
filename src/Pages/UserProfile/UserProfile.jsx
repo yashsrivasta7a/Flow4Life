@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { FaMapMarkerAlt, FaComments, FaPhone } from "react-icons/fa";
 import { useParams, useNavigate } from "react-router-dom";
-import { getDatabase, ref, get, push, set } from "firebase/database";
+import { getDatabase, ref, get, set, update } from "firebase/database";
 import { getAuth } from "firebase/auth";
 import { toast } from "react-hot-toast";
 import Navbar from '../../components/Navbar';
 import { sendChatNotification } from '../../Utils/Notifications';
-import { User, MessageCircle, MapPin, Droplet, Calendar } from 'lucide-react';
+import { 
+  User, MessageCircle, MapPin, Droplet, Calendar, 
+  Activity, Heart, Clock, Award, ChevronLeft, Mail,
+  CheckCircle, XCircle
+} from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const UserProfile = () => {
   const { userId } = useParams();
@@ -28,10 +32,7 @@ const UserProfile = () => {
           return;
         }
 
-        // Check if this is the current user's profile
         setIsOwnProfile(auth.currentUser?.uid === userId);
-
-        // Fetch user data
         const userRef = ref(db, `users/${userId}`);
         const donorRef = ref(db, `donation_requests/${userId}`);
         
@@ -63,9 +64,7 @@ const UserProfile = () => {
     fetchUserProfile();
   }, [userId, db, auth.currentUser]);
 
-  const handleGoBack = () => {
-    navigate(-1);
-  };
+  const handleGoBack = () => navigate(-1);
 
   const handleChat = async () => {
     if (!auth.currentUser) {
@@ -80,15 +79,11 @@ const UserProfile = () => {
     }
 
     try {
-      // Generate a unique chat ID that will be the same for both users
       const chatId = [auth.currentUser.uid, userId].sort().join('_');
-
-      // Check if chat already exists
       const chatRef = ref(db, `chats/${chatId}`);
       const chatSnapshot = await get(chatRef);
 
       if (!chatSnapshot.exists()) {
-        // Create new chat
         const chatData = {
           participants: [auth.currentUser.uid, userId],
           participantNames: {
@@ -103,7 +98,6 @@ const UserProfile = () => {
           }
         };
 
-        // Create chat entries for both users simultaneously
         const updates = {
           [`chats/${chatId}`]: chatData,
           [`userChats/${auth.currentUser.uid}/${chatId}`]: {
@@ -122,10 +116,7 @@ const UserProfile = () => {
           }
         };
 
-        // Use update to write to multiple paths atomically
         await set(ref(db), updates);
-
-        // Send notification to the other user
         await sendChatNotification(
           userId,
           "A new chat has been started with you",
@@ -134,27 +125,16 @@ const UserProfile = () => {
 
         toast.success("Chat started successfully");
       }
-
-      // Navigate to chats page
       navigate('/chats');
     } catch (error) {
       console.error("Error starting chat:", error);
-      if (error.code === 'PERMISSION_DENIED') {
-        toast.error("You don't have permission to start this chat. Please try again later.");
-      } else {
-        toast.error("Failed to start chat. Please try again.");
-      }
+      toast.error("Failed to start chat. Please try again.");
     }
-  };
-
-  const handleCall = () => {
-    // You might want to implement a call functionality or show contact info
-    alert(`Calling ${userProfile.name}`);
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-red-500 border-t-transparent"></div>
       </div>
     );
@@ -162,17 +142,44 @@ const UserProfile = () => {
 
   if (!userProfile) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <p className="text-xl text-gray-600">User not found</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+        <p className="text-xl text-gray-600 mb-4">User not found</p>
         <button
           onClick={handleGoBack}
-          className="mt-4 px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+          className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2"
         >
-          Go Back
+          <ChevronLeft className="w-4 h-4" /> Go Back
         </button>
       </div>
     );
   }
+
+  const stats = [
+    {
+      icon: <Droplet className="w-6 h-6 text-blue-500" />,
+      label: "Blood Type",
+      value: userProfile.bloodType || "Not specified",
+      color: "bg-blue-50"
+    },
+    {
+      icon: <Heart className="w-6 h-6 text-red-500" />,
+      label: "Donations",
+      value: userProfile.donations || "0",
+      color: "bg-red-50"
+    },
+    {
+      icon: <Activity className="w-6 h-6 text-green-500" />,
+      label: "Status",
+      value: userProfile.status || "Available",
+      color: "bg-green-50"
+    },
+    {
+      icon: <Award className="w-6 h-6 text-purple-500" />,
+      label: "Member Since",
+      value: new Date(userProfile.createdAt || Date.now()).getFullYear(),
+      color: "bg-purple-50"
+    }
+  ];
 
   return (
     <>
@@ -185,96 +192,170 @@ const UserProfile = () => {
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
       />
-      <div className="min-h-screen bg-gray-100 py-8 pt-20">
+      <div className="min-h-screen bg-gray-50 py-8 pt-20">
         <div className="max-w-4xl mx-auto px-4">
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg overflow-hidden"
+          >
             {/* Profile Header */}
-            <div className="relative h-48 bg-gradient-to-r from-red-500 to-red-600">
+            <div className="relative h-48 bg-gradient-to-r from-red-100 to-red-600">
               <button
                 onClick={handleGoBack}
-                className="absolute top-4 left-4 bg-white text-red-500 px-4 py-2 rounded-lg hover:bg-gray-100"
+                className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm text-red-500 px-4 py-2 rounded-lg hover:bg-white transition-colors flex items-center gap-2"
               >
-                Back
+                <ChevronLeft className="w-4 h-4" /> Back
               </button>
             </div>
 
             {/* Profile Content */}
             <div className="relative px-6 py-8">
+              {/* Avatar */}
               <div className="absolute -top-16 left-6">
-                <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-4 border-white shadow-lg">
-                  <span className="text-4xl font-bold text-red-500">
+                <div className="w-32 h-32 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center text-white shadow-lg transform hover:scale-105 transition-transform">
+                  <span className="text-4xl font-bold">
                     {userProfile.name ? userProfile.name[0].toUpperCase() : "?"}
                   </span>
                 </div>
               </div>
 
-              <div className="mt-16">
-                <h1 className="text-3xl font-bold text-gray-900">{userProfile.name}</h1>
-                {userProfile.bloodType && (
-                  <span className="inline-block mt-2 px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
-                    {userProfile.bloodType}
-                  </span>
-                )}
-                
-                {userProfile.city && (
-                  <div className="mt-4 flex items-center text-gray-600">
-                    <MapPin className="mr-2" />
-                    <span>{userProfile.city}</span>
-                  </div>
-                )}
-
-                {userProfile.bio && (
-                  <p className="mt-4 text-gray-600">{userProfile.bio}</p>
-                )}
-
-                {/* User Stats */}
-                <div className="space-y-2 text-sm text-gray-600">
-                  <div className="flex items-center">
-                    <MapPin className="w-4 h-4 mr-2" />
-                    <span>{userProfile.city}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Droplet className="w-4 h-4 mr-2" />
-                    <span>Blood Type: {userProfile.bloodType}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    <span>Last Donation: {userProfile.lastDonation ? new Date(userProfile.lastDonation).toLocaleDateString() : 'Not specified'}</span>
-                  </div>
+              {/* Main Content */}
+              <div className="mt-20">
+                {/* User Info */}
+                <div className="space-y-4">
+                  <h1 className="text-3xl font-bold text-gray-900">{userProfile.name}</h1>
+                  
+                  {userProfile.email && (
+                    <div className="flex items-center text-gray-600">
+                      <Mail className="w-4 h-4 mr-2" />
+                      <span>{userProfile.email}</span>
+                    </div>
+                  )}
+                  
+                  {userProfile.bloodType && (
+                    <span className="inline-flex items-center px-3 py-1 bg-red-50 text-red-700 rounded-full text-sm font-medium">
+                      <Droplet className="w-4 h-4 mr-1" />
+                      {userProfile.bloodType}
+                    </span>
+                  )}
+                  
+                  {userProfile.city && (
+                    <div className="flex items-center text-gray-600">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      <span>{userProfile.city}</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Action Buttons - Only show for other users' profiles */}
-                {!isOwnProfile && (
-                  <div className="mt-8 space-y-4">
-                    <button 
-                      onClick={handleChat}
-                      className="w-full bg-red-500 text-white py-3 rounded-lg hover:bg-red-600 transition flex items-center justify-center"
-                    >
-                      <MessageCircle className="w-5 h-5 mr-2" /> Chat Now
-                    </button>
-                    <button 
-                      onClick={() => navigate("/chats")}
-                      className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition flex items-center justify-center"
-                    >
-                      <MessageCircle className="w-5 h-5 mr-2" /> View All Chats
-                    </button>
+                {/* Quick Availability Toggle - Only show for own profile */}
+                {isOwnProfile && (
+                  <div className="fixed bottom-6 left-6 z-50">
+                    <div className="bg-white rounded-xl shadow-lg p-4">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const newStatus = userProfile.status === 'available' ? 'unavailable' : 'available';
+                              await update(ref(db), {
+                                [`users/${userId}/status`]: newStatus,
+                                [`donation_requests/${userId}/status`]: newStatus
+                              });
+                              setUserProfile(prev => ({
+                                ...prev,
+                                status: newStatus
+                              }));
+                              toast.success(`Status updated to ${newStatus}`);
+                            } catch (error) {
+                              console.error('Error updating status:', error);
+                              toast.error('Failed to update status');
+                            }
+                          }}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                            userProfile.status === 'available'
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                          }`}
+                        >
+                          {userProfile.status === 'available' ? (
+                            <>
+                              <CheckCircle className="w-5 h-5" />
+                              <span>Available</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="w-5 h-5" />
+                              <span>Unavailable</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {/* Edit Profile Button - Only show for own profile */}
-                {isOwnProfile && (
-                  <div className="mt-8">
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+                  {stats.map((stat, index) => (
+                    <motion.div
+                      key={stat.label}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className={`${stat.color} rounded-2xl p-4 flex flex-col items-center justify-center text-center space-y-2`}
+                    >
+                      {stat.icon}
+                      <span className="text-sm text-gray-600">{stat.label}</span>
+                      <span className="text-lg font-semibold text-gray-900">{stat.value}</span>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Additional Info */}
+                <div className="mt-8 space-y-4 text-gray-600">
+                  {userProfile.lastDonation && (
+                    <div className="flex items-center">
+                      <Clock className="w-4 h-4 mr-2" />
+                      <span>Last Donation: {new Date(userProfile.lastDonation).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  
+                  {userProfile.bio && (
+                    <p className="text-gray-600 mt-4 bg-gray-50 p-4 rounded-lg">
+                      {userProfile.bio}
+                    </p>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="mt-8 space-y-4">
+                  {!isOwnProfile ? (
+                    <>
+                      <button 
+                        onClick={handleChat}
+                        className="w-full bg-red-500 text-white py-3 rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-2 shadow-sm"
+                      >
+                        <MessageCircle className="w-5 h-5" /> Start Chat
+                      </button>
+                      <button 
+                        onClick={() => navigate("/chats")}
+                        className="w-full bg-gray-100 text-gray-700 py-3 rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <MessageCircle className="w-5 h-5" /> View All Chats
+                      </button>
+                    </>
+                  ) : (
                     <button 
                       onClick={() => navigate("/profilesetup")}
-                      className="w-full bg-red-500 text-white py-3 rounded-lg hover:bg-red-600 transition flex items-center justify-center"
+                      className="w-full bg-red-500 text-white py-3 rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-2 shadow-sm"
                     >
-                      <User className="w-5 h-5 mr-2" /> Edit Profile
+                      <User className="w-5 h-5" /> Edit Profile
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </>

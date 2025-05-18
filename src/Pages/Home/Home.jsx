@@ -129,12 +129,12 @@ const Home = () => {
             
             {user && userType && (
               <div className="mb-8">
-                <Link
+                {/* <Link
                   to={userType === 'donor' ? '/donor' : '/requester'}
                   className="bg-red-500 text-white px-6 py-2 rounded-full hover:bg-red-600 transition-colors"
                 >
                   Go to Your Dashboard
-                </Link>
+                </Link> */}
               </div>
             )}
           </motion.div>

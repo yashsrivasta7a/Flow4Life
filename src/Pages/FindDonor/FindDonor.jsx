@@ -48,6 +48,7 @@ const FindDonor = () => {
 
     onValue(donorsQuery, (snapshot) => {
       const data = snapshot.val();
+      console.log("Raw donor data:", data); // Debug log
       if (data) {
         let donorsArray = Object.entries(data).map(([id, details]) => ({
           id,
@@ -57,31 +58,49 @@ const FindDonor = () => {
             requestDetails.location?.longitude,
             details.latitude,
             details.longitude
-          )
+          ),
+          isInSameCity: details.city && requestDetails.city && 
+            details.city.toLowerCase() === requestDetails.city.toLowerCase()
         }));
 
         // Store all donors before filtering
         setAllDonors(donorsArray);
+        console.log("All donors:", donorsArray); // Debug log
 
         // Apply filters only if not showing all donors
         if (!showAllDonors) {
-          // Filter compatible blood types
+          // Filter out unavailable donors and check blood type compatibility
           donorsArray = donorsArray.filter(donor => {
+            // First check if donor is available
+            if (donor.status === 'unavailable') return false;
+            
+            // Then check blood type compatibility
             if (!requestDetails.bloodType) return true;
             return isBloodCompatible(requestDetails.bloodType, donor.bloodType);
           });
 
-          // Sort by distance if location is available
+          // Sort by location and distance if location is available
           if (filterByDistance && requestDetails.location) {
-            donorsArray.sort((a, b) => a.distance - b.distance);
+            donorsArray.sort((a, b) => {
+              // First, prioritize donors in the same city
+              if (a.isInSameCity && !b.isInSameCity) return -1;
+              if (!a.isInSameCity && b.isInSameCity) return 1;
+              
+              // Then sort by distance
+              if (sortOrder === "nearest") {
+                return a.distance - b.distance;
+              } else {
+                return b.distance - a.distance;
+              }
+            });
           }
         }
-
+        console.log("Filtered donors:", donorsArray); // Debug log
         setDonors(donorsArray);
       }
       setLoading(false);
     });
-  }, [database, requestDetails, filterByDistance, showAllDonors]);
+  }, [database, requestDetails, filterByDistance, showAllDonors, sortOrder]);
 
   useEffect(() => {
     if (auth.currentUser) {
@@ -195,15 +214,7 @@ const FindDonor = () => {
   };
 
   const handleSortChange = () => {
-    setSortOrder(sortOrder === "nearest" ? "farthest" : "nearest");
-    const sortedDonors = [...donors].sort((a, b) => {
-      if (sortOrder === "nearest") {
-        return b.distance - a.distance; // Switch to farthest first
-      } else {
-        return a.distance - b.distance; // Switch to nearest first
-      }
-    });
-    setDonors(sortedDonors);
+    setSortOrder(prevOrder => prevOrder === "nearest" ? "farthest" : "nearest");
   };
 
   const getChatPreview = (donorId) => {
@@ -220,6 +231,113 @@ const FindDonor = () => {
       donor.city?.toLowerCase().includes(searchLower)
     );
   });
+
+  // Add error boundary for donor display
+  const renderDonorName = (donor) => {
+    try {
+      return donor.name || "Unknown Donor";
+    } catch (error) {
+      console.error("Error rendering donor name:", error, donor);
+      return "Unknown Donor";
+    }
+  };
+
+  // Add a function to display location information
+  const renderLocationInfo = (donor) => {
+    const locationText = [];
+    
+    if (donor.isInSameCity) {
+      locationText.push(<span key="same-city" className="text-green-600 font-medium">Same City</span>);
+    }
+    
+    if (donor.city) {
+      locationText.push(<span key="city">{donor.city}</span>);
+    }
+
+    if (donor.distance !== Infinity) {
+      locationText.push(
+        <span key="distance" className="text-gray-500">
+          ({donor.distance.toFixed(1)} km away)
+        </span>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2">
+        <MapPin className="w-4 h-4 mr-1" />
+        {locationText.map((text, index) => (
+          <React.Fragment key={index}>
+            {index > 0 && <span className="mx-1">•</span>}
+            {text}
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  };
+
+  // Update the donor card render to use the safe name renderer
+  const renderDonorCard = (donor) => {
+    const chatPreview = getChatPreview(donor.userId);
+    return (
+      <motion.div
+        key={donor.id}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow ${
+          donor.isInSameCity ? 'border-2 border-green-500' : ''
+        }`}
+      >
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            <div 
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => handleViewProfile(donor.userId)}
+            >
+              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                <User className="w-6 h-6 text-gray-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 hover:text-red-600">
+                  {renderDonorName(donor)}
+                </h3>
+                <span className="inline-block bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm font-medium">
+                  {donor.bloodType || "Unknown"}
+                </span>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => handleChatClick(donor.userId, donor.name)}
+            className="flex items-center gap-2 text-blue-600 hover:text-blue-800 px-3 py-1 rounded-lg hover:bg-blue-50 relative"
+          >
+            <MessageCircle className="w-5 h-5" />
+            <span>Chat</span>
+            {chatPreview?.unread && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+            )}
+          </button>
+        </div>
+        
+        <div className="space-y-2 text-sm text-gray-600">
+          {renderLocationInfo(donor)}
+          <div>Last Donation: {donor.lastDonation ? new Date(donor.lastDonation).toLocaleDateString() : 'Not specified'}</div>
+          {chatPreview && (
+            <div className="mt-3 p-2 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-500">Last message:</p>
+              <p className="text-sm text-gray-700 truncate">{chatPreview.lastMessage}</p>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => handleViewProfile(donor.userId)}
+          className="mt-4 w-full text-gray-600 hover:text-red-600 text-sm font-medium flex items-center justify-center gap-2 py-2 border border-gray-200 rounded-lg hover:border-red-200 transition-colors"
+        >
+          <User className="w-4 h-4" />
+          View Full Profile
+        </button>
+      </motion.div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -293,74 +411,7 @@ const FindDonor = () => {
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
             </div>
           ) : filteredDonors.length > 0 ? (
-            filteredDonors.map((donor) => {
-              const chatPreview = getChatPreview(donor.userId);
-              return (
-                <motion.div
-                  key={donor.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <div 
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => handleViewProfile(donor.userId)}
-                      >
-                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                          <User className="w-6 h-6 text-gray-600" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-800 hover:text-red-600">
-                            {donor.name}
-                </h3>
-                          <span className="inline-block bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm font-medium">
-                            {donor.bloodType}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleChatClick(donor.userId, donor.name)}
-                      className="flex items-center gap-2 text-blue-600 hover:text-blue-800 px-3 py-1 rounded-lg hover:bg-blue-50 relative"
-                    >
-                      <MessageCircle className="w-5 h-5" />
-                      <span>Chat</span>
-                      {chatPreview?.unread && (
-                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-                      )}
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-2 text-sm text-gray-600">
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 mr-2" />
-                      <span>{donor.city}</span>
-                    </div>
-                    {donor.distance !== Infinity && (
-                      <div className="text-sm text-gray-500">
-                        Distance: {donor.distance.toFixed(1)} km
-                      </div>
-                    )}
-                    <div>Last Donation: {donor.lastDonation ? new Date(donor.lastDonation).toLocaleDateString() : 'Not specified'}</div>
-                    {chatPreview && (
-                      <div className="mt-3 p-2 bg-gray-50 rounded-lg">
-                        <p className="text-xs text-gray-500">Last message:</p>
-                        <p className="text-sm text-gray-700 truncate">{chatPreview.lastMessage}</p>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleViewProfile(donor.userId)}
-                    className="mt-4 w-full text-gray-600 hover:text-red-600 text-sm font-medium flex items-center justify-center gap-2 py-2 border border-gray-200 rounded-lg hover:border-red-200 transition-colors"
-                  >
-                    <User className="w-4 h-4" />
-                    View Full Profile
-                  </button>
-                </motion.div>
-              );
-            })
+            filteredDonors.map(renderDonorCard)
           ) : (
             <div className="col-span-full text-center py-12">
               <p className="text-gray-600 text-lg mb-4">
