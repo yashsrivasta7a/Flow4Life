@@ -33,6 +33,8 @@ const RequestChats = () => {
           .map(([id, chat]) => ({
             id,
             ...chat,
+            isRequester: chat.role === 'requester',
+            isDonor: chat.role === 'donor'
           }))
           .sort((a, b) => b.timestamp - a.timestamp);
         setChats(chatsArray);
@@ -61,9 +63,16 @@ const RequestChats = () => {
             .map(([id, message]) => ({
               id,
               ...message,
+              isCurrentUser: message.sender === auth.currentUser.uid
             }))
             .sort((a, b) => a.timestamp - b.timestamp);
           setMessages(messagesArray);
+
+          // Mark messages as read if they're not from current user
+          if (auth.currentUser) {
+            const chatRef = ref(database, `userChats/${auth.currentUser.uid}/${selectedChat}`);
+            set(chatRef, { unread: false }, { merge: true });
+          }
         } else {
           setMessages([]);
         }
@@ -71,16 +80,18 @@ const RequestChats = () => {
 
       return () => unsubscribe();
     }
-  }, [selectedChat, database]);
+  }, [selectedChat, database, auth.currentUser]);
 
   const handleSendMessage = async () => {
     if (!message.trim() || !selectedChat) return;
 
     try {
+      const chat = chats.find(c => c.id === selectedChat);
       const newMessage = {
         text: message,
         sender: auth.currentUser.uid,
         timestamp: Date.now(),
+        senderRole: chat.role
       };
 
       // Add message to messages collection
@@ -90,11 +101,10 @@ const RequestChats = () => {
       await set(ref(database, `chats/${selectedChat}/lastMessage`), {
         text: message,
         timestamp: Date.now(),
-        sender: auth.currentUser.uid,
+        sender: auth.currentUser.uid
       });
 
       // Update last message in both users' chat lists
-      const chat = chats.find(c => c.id === selectedChat);
       await set(ref(database, `userChats/${auth.currentUser.uid}/${selectedChat}/lastMessage`), message);
       await set(ref(database, `userChats/${auth.currentUser.uid}/${selectedChat}/timestamp`), Date.now());
       await set(ref(database, `userChats/${chat.otherUserId}/${selectedChat}/lastMessage`), message);
@@ -202,7 +212,7 @@ const RequestChats = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between items-start">
                     <h3 className="font-semibold text-gray-800">
-                      {chat.otherUserName}
+                      {chat.requestInfo?.patientName || chat.otherUserName}
                     </h3>
                     <span className="text-xs text-gray-500">
                       {getTimeAgo(chat.timestamp)}
@@ -247,7 +257,8 @@ const RequestChats = () => {
                   </button>
                   <div>
                     <h3 className="font-semibold">
-                      {chats.find(c => c.id === selectedChat)?.otherUserName}
+                      {chats.find(c => c.id === selectedChat)?.requestInfo?.patientName || 
+                       chats.find(c => c.id === selectedChat)?.otherUserName}
                     </h3>
                     <p className="text-sm text-gray-500">
                       {chats.find(c => c.id === selectedChat)?.requestInfo?.bloodType} Blood Request
@@ -262,12 +273,12 @@ const RequestChats = () => {
                   <div
                     key={msg.id}
                     className={`flex ${
-                      msg.sender === auth.currentUser.uid ? 'justify-end' : 'justify-start'
+                      msg.isCurrentUser ? 'justify-end' : 'justify-start'
                     }`}
                   >
                     <div
                       className={`max-w-[80%] rounded-2xl px-4 py-2 ${
-                        msg.sender === auth.currentUser.uid
+                        msg.isCurrentUser
                           ? 'bg-red-600 text-white'
                           : 'bg-gray-100 text-gray-900'
                       }`}

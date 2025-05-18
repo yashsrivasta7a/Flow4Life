@@ -83,7 +83,7 @@ const BloodRequests = () => {
     return deg * (Math.PI / 180);
   };
 
-  const handleChatClick = async (requesterId, requesterName) => {
+  const handleChatClick = async (requesterId, requesterName, request) => {
     if (!auth.currentUser) {
       toast.error("Please sign in to chat with requesters");
       navigate('/signin');
@@ -110,18 +110,26 @@ const BloodRequests = () => {
       if (!existingChatId) {
         // Create new chat if none exists
         chatId = push(ref(database, 'chats')).key;
+        
+        // Main chat data
         const chatData = {
-          participants: [auth.currentUser.uid, requesterId],
+          participants: {
+            donor: auth.currentUser.uid,
+            requester: requesterId
+          },
           participantNames: {
-            [auth.currentUser.uid]: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
-            [requesterId]: requesterName
+            donor: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
+            requester: requesterName
           },
           requestInfo: {
             bloodType: request.bloodType,
             hospital: request.hospital,
             city: request.city,
-            urgency: request.urgency
+            urgency: request.urgency,
+            patientName: request.patientName,
+            requestId: request.id
           },
+          createdAt: Date.now(),
           lastMessage: {
             text: "Chat started",
             timestamp: Date.now(),
@@ -132,29 +140,41 @@ const BloodRequests = () => {
         // Save in main chats collection
         await set(ref(database, `chats/${chatId}`), chatData);
         
-        // Save in current user's chat list (donor's view)
-        const userChatData = {
+        // Save in donor's chat list (current user's view)
+        const donorChatData = {
           otherUserId: requesterId,
           otherUserName: requesterName,
+          role: 'donor',
           lastMessage: "Chat started",
           timestamp: Date.now(),
           unread: false,
           requestInfo: {
             bloodType: request.bloodType,
             hospital: request.hospital,
-            urgency: request.urgency
+            city: request.city,
+            urgency: request.urgency,
+            patientName: request.patientName,
+            requestId: request.id
           }
         };
-        await set(ref(database, `userChats/${auth.currentUser.uid}/${chatId}`), userChatData);
+        await set(ref(database, `userChats/${auth.currentUser.uid}/${chatId}`), donorChatData);
         
         // Save in requester's chat list
         const requesterChatData = {
           otherUserId: auth.currentUser.uid,
           otherUserName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
+          role: 'requester',
           lastMessage: "Chat started",
           timestamp: Date.now(),
           unread: true,
-          isDonor: true
+          requestInfo: {
+            bloodType: request.bloodType,
+            hospital: request.hospital,
+            city: request.city,
+            urgency: request.urgency,
+            patientName: request.patientName,
+            requestId: request.id
+          }
         };
         await set(ref(database, `userChats/${requesterId}/${chatId}`), requesterChatData);
         
@@ -325,7 +345,7 @@ const BloodRequests = () => {
                   </div>
                   {auth.currentUser && request.userId !== auth.currentUser.uid && (
                     <button
-                      onClick={() => handleChatClick(request.userId, request.patientName)}
+                      onClick={() => handleChatClick(request.userId, request.patientName, request)}
                       className="flex items-center gap-2 text-blue-600 hover:text-blue-700 px-4 py-2 rounded-xl hover:bg-blue-50 transition-all relative group"
                     >
                       <MessageCircle className="w-5 h-5 transform group-hover:scale-110 transition-transform" />
@@ -385,7 +405,7 @@ const BloodRequests = () => {
                   {/* Donor Action Button */}
                   {auth.currentUser && request.userId !== auth.currentUser.uid && (
                     <button
-                      onClick={() => handleChatClick(request.userId, request.patientName)}
+                      onClick={() => handleChatClick(request.userId, request.patientName, request)}
                       className="w-full mt-4 bg-red-600 text-white px-4 py-3 rounded-xl hover:bg-red-700 transition-all flex items-center justify-center gap-2 group"
                     >
                       <MessageCircle className="w-5 h-5 transform group-hover:scale-110 transition-transform" />
