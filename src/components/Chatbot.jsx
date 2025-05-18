@@ -4,15 +4,14 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const Chatbot = () => {
   const [messages, setMessages] = useState([
-    { sender: 'bot', text: "Hi! I'm Flow4Life Chatbot. How can I help you today?" }
+    { sender: 'bot', text: "Hi! I'm Flow4Life Chatbot, your medical assistant specialized in blood donation. I can help you with blood donation info, requests, eligibility, and more. How can I assist you today?" }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
-  const apiKey = "AIzaSyAxCaUGVn_CUtOFH2EgHyD5LglTpD-K7oY"; // Replace with your actual API key
-
+  const apiKey = "AIzaSyAxCaUGVn_CUtOFH2EgHyD5LglTpD-K7oY"; 
   useEffect(() => {
     if (!apiKey) {
       console.error('Gemini API key not found in environment variables');
@@ -25,22 +24,26 @@ const Chatbot = () => {
 
   const handleSend = async () => {
     if (!input.trim()) return;
-
+  
     const userMessage = { sender: 'user', text: input };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
-
+  
     try {
       if (!apiKey) throw new Error('API key not available');
-
+  
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-      const result = await model.generateContent(input);
+  
+      // Add system prompt to guide chatbot's role
+      const systemPrompt = "You are a helpful medical assistant chatbot specialized in blood donation. You help users with blood donation eligibility, requests, information, and related topics.";
+      const fullInput = systemPrompt + "\nUser: " + input;
+  
+      const result = await model.generateContent(fullInput);
       const response = await result.response;
       const reply = response.text() || "Sorry, I didn't get that.";
-
+  
       setMessages(prev => [...prev, { sender: 'bot', text: reply }]);
     } catch (error) {
       console.error('Error:', error);

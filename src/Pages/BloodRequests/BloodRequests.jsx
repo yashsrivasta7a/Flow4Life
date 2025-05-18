@@ -116,6 +116,12 @@ const BloodRequests = () => {
             [auth.currentUser.uid]: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
             [requesterId]: requesterName
           },
+          requestInfo: {
+            bloodType: request.bloodType,
+            hospital: request.hospital,
+            city: request.city,
+            urgency: request.urgency
+          },
           lastMessage: {
             text: "Chat started",
             timestamp: Date.now(),
@@ -126,13 +132,18 @@ const BloodRequests = () => {
         // Save in main chats collection
         await set(ref(database, `chats/${chatId}`), chatData);
         
-        // Save in current user's chat list
+        // Save in current user's chat list (donor's view)
         const userChatData = {
           otherUserId: requesterId,
           otherUserName: requesterName,
           lastMessage: "Chat started",
           timestamp: Date.now(),
-          unread: false
+          unread: false,
+          requestInfo: {
+            bloodType: request.bloodType,
+            hospital: request.hospital,
+            urgency: request.urgency
+          }
         };
         await set(ref(database, `userChats/${auth.currentUser.uid}/${chatId}`), userChatData);
         
@@ -142,25 +153,26 @@ const BloodRequests = () => {
           otherUserName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
           lastMessage: "Chat started",
           timestamp: Date.now(),
-          unread: true
+          unread: true,
+          isDonor: true
         };
         await set(ref(database, `userChats/${requesterId}/${chatId}`), requesterChatData);
         
         // Send notification to the requester
         await sendChatNotification(
           requesterId,
-          "A new chat has been started with you",
+          `A donor has responded to your ${request.bloodType} blood request`,
           auth.currentUser.displayName || auth.currentUser.email.split('@')[0]
         );
 
-        toast.success("Chat started successfully");
+        toast.success("Connected with requester successfully");
       }
 
-      // Navigate to chats page
-      navigate('/chats');
+      // Navigate directly to the specific chat
+      navigate('/chats', { state: { activeChatId: chatId, isNewChat: !existingChatId } });
     } catch (error) {
       console.error("Error handling chat:", error);
-      toast.error("Failed to start chat. Please try again.");
+      toast.error("Failed to connect with requester. Please try again.");
     }
   };
 
@@ -238,6 +250,13 @@ const BloodRequests = () => {
               </p>
             </div>
             <div className="flex gap-3">
+              <button
+                onClick={() => navigate("/chats")}
+                className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white px-5 py-2 rounded-xl flex items-center gap-2 transition-all transform hover:scale-105"
+              >
+                <MessageCircle className="w-5 h-5" />
+                <span>My Chats</span>
+              </button>
               <button
                 onClick={() => navigate("/")}
                 className="bg-white text-red-600 px-5 py-2 rounded-xl hover:bg-red-50 transition-all transform hover:scale-105"
@@ -361,6 +380,17 @@ const BloodRequests = () => {
                       <div className="font-medium mb-1 text-blue-700">Additional Information</div>
                       <p className="text-blue-800">{request.additionalInfo}</p>
                     </div>
+                  )}
+
+                  {/* Donor Action Button */}
+                  {auth.currentUser && request.userId !== auth.currentUser.uid && (
+                    <button
+                      onClick={() => handleChatClick(request.userId, request.patientName)}
+                      className="w-full mt-4 bg-red-600 text-white px-4 py-3 rounded-xl hover:bg-red-700 transition-all flex items-center justify-center gap-2 group"
+                    >
+                      <MessageCircle className="w-5 h-5 transform group-hover:scale-110 transition-transform" />
+                      <span>Respond to Request</span>
+                    </button>
                   )}
                 </div>
               </motion.div>
