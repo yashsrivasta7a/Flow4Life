@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TbMessageChatbot } from 'react-icons/tb';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const Chatbot = () => {
   const [messages, setMessages] = useState([
@@ -8,66 +9,49 @@ const Chatbot = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-
   const messagesEndRef = useRef(null);
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
+
+  const apiKey = "AIzaSyAxCaUGVn_CUtOFH2EgHyD5LglTpD-K7oY";
 
   useEffect(() => {
-    if (!key) {
+    if (!apiKey) {
       console.error('Gemini API key not found in environment variables');
     }
-  }, [key]);
+  }, [apiKey]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
   const handleSend = async () => {
-  if (!input.trim()) return;
+    if (!input.trim()) return;
 
-  const userMessage = { sender: 'user', text: input };
-  setMessages(prev => [...prev, userMessage]);
-  setInput('');
-  setIsLoading(true);
+    const userMessage = { sender: 'user', text: input };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
 
-  try {
-    if (!key) throw new Error('API key not available');
+    try {
+      if (!apiKey) throw new Error('API key not available');
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/chat-bison-001:generateMessage?key=${key}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          prompt: {
-            messages: [
-              { author: "user", content: input }
-            ]
-          }
-        })
-      }
-    );
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    const data = await res.json();
+      const result = await model.generateContent(input);
+      const response = await result.response;
+      const reply = response.text() || "Sorry, I didn't get that.";
 
-    if (data.error) throw new Error(data.error.message);
-
-    // Extract the chatbot reply from response
-    const reply = data.candidates?.[0]?.message?.content || "Sorry, I didn't get that.";
-    setMessages(prev => [...prev, { sender: 'bot', text: reply }]);
-  } catch (error) {
-    console.error('Error:', error);
-    setMessages(prev => [
-      ...prev,
-      { sender: 'bot', text: 'Error connecting to Gemini API. Please check your API key and model access.' }
-    ]);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+      setMessages(prev => [...prev, { sender: 'bot', text: reply }]);
+    } catch (error) {
+      console.error('Error:', error);
+      setMessages(prev => [
+        ...prev,
+        { sender: 'bot', text: 'Error connecting to Gemini API. Please check your API key and model access.' }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !isLoading) {
