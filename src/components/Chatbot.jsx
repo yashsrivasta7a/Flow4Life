@@ -11,7 +11,7 @@ const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
-  const apiKey = "AIzaSyAxCaUGVn_CUtOFH2EgHyD5LglTpD-K7oY";
+  const apiKey = "AIzaSyAxCaUGVn_CUtOFH2EgHyD5LglTpD-K7oY"; // Replace with your actual API key
 
   useEffect(() => {
     if (!apiKey) {
@@ -71,67 +71,67 @@ const Chatbot = () => {
         </button>
       )}
 
-      <div
-        className={`fixed bottom-0 right-0 top-0 z-50 w-full sm:w-[400px] bg-white shadow-2xl border-l border-gray-300 flex flex-col transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="bg-red-500 text-white px-4 py-3 font-bold flex justify-between items-center">
-          <span>Flow4Life Chatbot</span>
-          <button onClick={() => setIsOpen(false)} className="text-white text-xl font-bold">×</button>
-        </div>
+      {isOpen && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 w-full sm:w-[400px] max-h-[80vh] bg-white shadow-2xl border border-gray-300 rounded-md flex flex-col transition-transform duration-300`}
+        >
+          <div className="bg-red-500 text-white px-4 py-3 font-bold flex justify-between items-center rounded-t-md">
+            <span>Flow4Life Chatbot</span>
+            <button onClick={() => setIsOpen(false)} className="text-white text-xl font-bold">×</button>
+          </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {messages.map((msg, index) => (
-            <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${
-                  msg.sender === 'user'
-                    ? 'bg-red-500 text-white rounded-br-none'
-                    : 'bg-gray-200 text-gray-800 rounded-bl-none'
-                }`}
-              >
-                {msg.text}
-              </div>
-            </div>
-          ))}
-
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-200 text-gray-800 rounded-2xl px-4 py-2 text-sm">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {messages.map((msg, index) => (
+              <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${
+                    msg.sender === 'user'
+                      ? 'bg-red-500 text-white rounded-br-none'
+                      : 'bg-gray-200 text-gray-800 rounded-bl-none'
+                  }`}
+                >
+                  {msg.text}
                 </div>
               </div>
-            </div>
-          )}
+            ))}
 
-          <div ref={messagesEndRef} />
-        </div>
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-200 text-gray-800 rounded-2xl px-4 py-2 text-sm">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
 
-        <div className="border-t px-4 py-3 flex items-center gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your message..."
-            disabled={isLoading}
-            className="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring focus:ring-red-300"
-          />
-          <button
-            onClick={handleSend}
-            disabled={isLoading}
-            className={`text-white px-4 py-2 rounded-full transition ${
-              isLoading ? 'bg-red-300' : 'bg-red-500 hover:bg-red-600'
-            }`}
-          >
-            {isLoading ? '...' : 'Send'}
-          </button>
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="border-t px-4 py-3 flex items-center gap-2 rounded-b-md">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type your message..."
+              disabled={isLoading}
+              className="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring focus:ring-red-300"
+            />
+            <button
+              onClick={handleSend}
+              disabled={isLoading}
+              className={`text-white px-4 py-2 rounded-full transition ${
+                isLoading ? 'bg-red-300' : 'bg-red-500 hover:bg-red-600'
+              }`}
+            >
+              {isLoading ? '...' : 'Send'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 };
