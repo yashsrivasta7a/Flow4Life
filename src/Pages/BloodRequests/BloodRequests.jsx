@@ -189,7 +189,14 @@ const BloodRequests = () => {
       }
 
       // Navigate directly to the specific chat
-      navigate('/request-chats', { state: { activeChatId: chatId, isNewChat: !existingChatId } });
+      navigate('/request-chats', { 
+        state: { 
+          activeChatId: chatId,
+          isNewChat: !existingChatId,
+          otherUserName: requesterName,
+          otherUserId: requesterId
+        } 
+      });
     } catch (error) {
       console.error("Error handling chat:", error);
       toast.error("Failed to connect with requester. Please try again.");
