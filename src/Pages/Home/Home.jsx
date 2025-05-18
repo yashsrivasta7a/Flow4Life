@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Search } from 'lucide-react';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getDatabase, ref, get } from 'firebase/database';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import Navbar from '../../components/Navbar';
@@ -10,17 +11,34 @@ import Navbar from '../../components/Navbar';
 const Home = () => {
   const navigate = useNavigate();
   const auth = getAuth();
+  const db = getDatabase();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
+  const [userType, setUserType] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, 
-      (currentUser) => {
+      async (currentUser) => {
         setUser(currentUser);
+        
+        if (currentUser) {
+          // Check if user has a profile and user type
+          try {
+            const userRef = ref(db, `users/${currentUser.uid}`);
+            const snapshot = await get(userRef);
+            
+            if (snapshot.exists()) {
+              setUserType(snapshot.val().userType || 'donor');
+            }
+          } catch (error) {
+            console.error("Error fetching user data:", error);
+          }
+        }
+        
         setLoading(false);
       },
       (error) => {
@@ -31,12 +49,14 @@ const Home = () => {
     );
 
     return () => unsubscribe();
-  }, [auth]);
+  }, [auth, db]);
 
   const handleAuthAction = (path, userType) => {
     if (user) {
+      // If user is logged in, redirect them to the correct home page
       navigate(path);
     } else {
+      // If not logged in, send to signup with the userType
       navigate('/signup', { state: { userType } });
     }
   };
@@ -55,7 +75,7 @@ const Home = () => {
   if (loading) {
     return (
       <div className="min-h-screen w-full bg-gradient-to-b from-purple-50 to-white flex items-center justify-center">
-        <div className="text-purple-600 text-xl">Loading...</div>
+        <div className="text-red-500 text-xl">Loading...</div>
       </div>
     );
   }
@@ -91,14 +111,30 @@ const Home = () => {
           >
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 mb-6">
               Welcome to
-              <span className="text-purple-600"> Flow4Life</span>
+              <span className="text-red-500"> Flow4Life</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 mx-auto max-w-3xl">
               Connecting blood donors with those in need. Every donation counts, every life matters.
             </p>
-            {user && (
+            {/*{user && (
               <div className="bg-purple-100 text-purple-800 px-4 py-2 rounded-lg inline-block mb-8">
                 Logged in as: {user.displayName || user.email}
+                {userType && (
+                  <span className="ml-2 text-sm bg-purple-200 px-2 py-1 rounded">
+                    {userType === 'donor' ? 'Donor' : 'Requester'}
+                  </span>
+                )}
+              </div>
+            )} */}
+            
+            {user && userType && (
+              <div className="mb-8">
+                <Link
+                  to={userType === 'donor' ? '/donor' : '/requester'}
+                  className="bg-red-500 text-white px-6 py-2 rounded-full hover:bg-red-600 transition-colors"
+                >
+                  Go to Your Dashboard
+                </Link>
               </div>
             )}
           </motion.div>
@@ -149,7 +185,7 @@ const Home = () => {
               transition={{ delay: 0.2 }}
               className="bg-white p-6 rounded-xl shadow-soft text-center"
             >
-              <h3 className="text-3xl font-bold text-purple-600 mb-2">10,000+</h3>
+              <h3 className="text-3xl font-bold text-red-500 mb-2">10,000+</h3>
               <p className="text-gray-600">Successful Donations</p>
             </motion.div>
             <motion.div
@@ -158,7 +194,7 @@ const Home = () => {
               transition={{ delay: 0.4 }}
               className="bg-white p-6 rounded-xl shadow-soft text-center"
             >
-              <h3 className="text-3xl font-bold text-purple-600 mb-2">5,000+</h3>
+              <h3 className="text-3xl font-bold text-red-500 mb-2">5,000+</h3>
               <p className="text-gray-600">Active Donors</p>
             </motion.div>
             <motion.div
@@ -167,7 +203,7 @@ const Home = () => {
               transition={{ delay: 0.6 }}
               className="bg-white p-6 rounded-xl shadow-soft text-center"
             >
-              <h3 className="text-3xl font-bold text-purple-600 mb-2">24/7</h3>
+              <h3 className="text-3xl font-bold text-red-500 mb-2">24/7</h3>
               <p className="text-gray-600">Emergency Support</p>
             </motion.div>
           </div>
