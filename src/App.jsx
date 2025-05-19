@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { getAuth } from 'firebase/auth';
 import Signuppage from './Pages/signup/Signuppage';
 import Signinpage from './Pages/signin/Signinpage';
 import Home from './Pages/Home/Home';
@@ -48,6 +49,7 @@ function AppContent() {
               <Route path="/signup" element={<Signuppage />} />
               <Route path="/learn-more" element={<LearnMore />} />
               <Route path="/chatbot" element={<Chatbot />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
 
               {/* Protected Routes */}
               <Route
@@ -167,6 +169,8 @@ function AppContent() {
 
 // App wrapper for Router
 function App() {
+ 
+
   if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
