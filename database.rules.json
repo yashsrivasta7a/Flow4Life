@@ -1,0 +1,44 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "donation_requests": {
+      ".indexOn": ["bloodType", "city", "status"],
+      "$uid": {
+        ".read": true,
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "blood_requests": {
+      ".indexOn": ["bloodType", "city", "status"],
+      "$uid": {
+        ".read": true,
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },    "users": {
+      ".indexOn": ["bloodType", "city", "status"],
+      "$uid": {
+        ".read": true,
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "notifications": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null"
+      }
+    },
+    "chats": {
+      "$chatId": {
+        ".read": "auth != null && (data.child('participants').hasChild(auth.uid))",
+        ".write": "auth != null && (data.child('participants').hasChild(auth.uid))"
+      }
+    },
+    "messages": {
+      "$chatId": {
+        ".read": "auth != null && root.child('chats').child($chatId).child('participants').hasChild(auth.uid)",
+        ".write": "auth != null && root.child('chats').child($chatId).child('participants').hasChild(auth.uid)"
+      }
+    }
+  }
+} 

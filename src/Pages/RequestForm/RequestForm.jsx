@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast';
 import { AlertCircle, Clock, MapPin } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import { sendCityNotification } from '../../components/SendCityNotification';
+import { checkAndSendMatchingRequests } from '../../Utils/EmailNotifications';
 
 const RequestForm = ({ emergency = false }) => {
     const navigate = useNavigate();
@@ -97,8 +98,8 @@ const RequestForm = ({ emergency = false }) => {
             const newRequestRef = push(ref(database, 'blood_requests'));
             await set(newRequestRef, requestData);
 
-            // Send notification to donors with same city and blood group
-            await sendCityNotification(formData.city, formData.bloodType, formData.urgency);
+            // Send notifications to matching donors
+            await checkAndSendMatchingRequests(requestData);
 
             toast.success("Blood request submitted and notifications sent!");
 

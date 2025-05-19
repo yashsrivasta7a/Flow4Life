@@ -123,7 +123,6 @@ const Chat = () => {
     setTypingTimeout(timeout);
   };
 
-  // Listen for typing status from other user
   useEffect(() => {
     if (!selectedChat) return;
 
@@ -160,7 +159,7 @@ const Chat = () => {
         const chatsList = Object.entries(data).map(([chatId, chatData]) => ({
           id: chatId,
           ...chatData
-        })).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); // Most recent first
+        })).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); 
 
         setChats(chatsList);
         if (!selectedChat && chatsList.length > 0) {
@@ -175,12 +174,11 @@ const Chat = () => {
   const fetchDonors = (userId) => {
     setDonorsLoading(true);
     const donorsRef = ref(database, "donation_requests");
-
     onValue(donorsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         const donorsList = Object.entries(data)
-          .filter(([_, donorData]) => donorData.userId !== userId) // exclude current user
+          .filter(([_, donorData]) => donorData.userId !== userId)
           .map(([id, donorData]) => ({
             id,
             userId: donorData.userId,

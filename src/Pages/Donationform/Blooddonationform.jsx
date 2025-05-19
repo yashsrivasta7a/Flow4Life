@@ -284,13 +284,10 @@ const BloodDonationForm = () => {
         name: formData.name,
         bloodType: formData.bloodType,
         city: formData.city,
-        phone: formData.phone,
-        timestamp: Date.now(),
+        lastDonation: formData.lastDonation || '',
         status: 'available',
-        lastDonation: formData.lastDonation || null,
-        age: formData.age,
-        gender: formData.gender,
-        weight: formData.weight
+        timestamp: Date.now(),
+        // email is NOT stored here, but in users node
       };
 
       // Update both nodes
