@@ -164,7 +164,7 @@ const UserProfile = () => {
     {
       icon: <Heart className="w-6 h-6 text-red-500" />,
       label: "Donations",
-      value: userProfile.donations || "0",
+      value: userProfile.donations || "Feature Coming Soon",
       color: "bg-red-50"
     },
     {
@@ -213,10 +213,20 @@ const UserProfile = () => {
             <div className="relative px-6 py-8">
               {/* Avatar */}
               <div className="absolute -top-16 left-6">
-                <div className="w-32 h-32 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center text-white shadow-lg transform hover:scale-105 transition-transform">
-                  <span className="text-4xl font-bold">
-                    {userProfile.name ? userProfile.name[0].toUpperCase() : "?"}
-                  </span>
+                <div className="w-32 h-32 rounded-2xl shadow-lg transform hover:scale-105 transition-transform overflow-hidden">
+                  {userProfile.profilePicture ? (
+                    <img 
+                      src={userProfile.profilePicture} 
+                      alt={`${userProfile.name}'s profile`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-white">
+                      <span className="text-4xl font-bold">
+                        {userProfile.name[0].toUpperCase()}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

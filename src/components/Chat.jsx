@@ -411,44 +411,43 @@ const Chat = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
+  return (    <div className="min-h-screen bg-gradient-to-b from-red-50 to-blue-50">
       {/* Header */}
       <motion.div
-        className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-10"
+        className="bg-gradient-to-r from-red-500 to-red-600 shadow-lg sticky top-0 z-10"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center">
-            <button
+          <div className="flex items-center">            <button
               onClick={() => navigate(-1)}
-              className="mr-4 p-2 rounded-full hover:bg-gray-100"
+              className="mr-4 p-2 rounded-full hover:bg-red-400 text-white transition-colors"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-2xl font-bold text-gray-900">Chat</h1>
+            <h1 className="text-2xl font-bold text-white">Chat</h1>
           </div>
           
           {/* Notification toggle button */}
           {!notificationsEnabled && (
             <button 
               onClick={requestNotifications}
-              className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+              className="px-3 py-1 bg-white/20 text-white rounded-md text-sm hover:bg-white/30 transition-colors backdrop-blur-sm"
             >
               Enable Notifications
             </button>
           )}
         </div>
-      </motion.div>
-
-      <div className="flex h-[calc(100vh-64px)] max-w-7xl mx-auto border border-gray-200 rounded-lg overflow-hidden shadow-lg">
+      </motion.div>      <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] max-w-7xl mx-auto border border-gray-200 rounded-lg overflow-hidden shadow-xl bg-white/90 backdrop-blur-sm m-4">
         {/* Sidebar: Donors and Chats */}
-        <div className="flex flex-col w-80 border-r border-gray-200">
+        <div className={`flex flex-col ${selectedChat ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-gray-200 bg-gradient-to-b from-gray-50 to-white`}>
           {/* Donors */}
           <div className="px-4 py-2 border-b border-gray-200">
-            <h2 className="font-semibold text-gray-700 mb-2">Donors</h2>
+            <h2 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <User className="w-5 h-5 text-gray-500" />
+              Available Donors
+            </h2>
             {donorsLoading ? (
               <p className="text-sm text-gray-500">Loading donors...</p>
             ) : donors.length === 0 ? (
@@ -456,10 +455,9 @@ const Chat = () => {
             ) : (
               <div className="max-h-48 overflow-y-auto">
                 {donors.map(donor => (
-                  <button
-                    key={`donor-${donor.id}`}
+                  <button                    key={`donor-${donor.id}`}
                     onClick={() => startNewChat(donor.userId, donor.name)}
-                    className="w-full text-left px-3 py-2 rounded hover:bg-gray-100 flex justify-between items-center"
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 flex justify-between items-center group transition-colors my-1"
                   >
                     <span>{donor.name}</span>
                     <span className="text-xs text-gray-500">{donor.bloodGroup}</span>
@@ -477,20 +475,24 @@ const Chat = () => {
               <p className="p-4 text-gray-500 text-sm">No chats yet</p>
             ) : (
               <ul>
-                {chats.map(chat => (
-                  <li key={`chat-${chat.id}`}>
+                {chats.map(chat => (                  <li key={`chat-${chat.id}`}>
                     <button
-                      onClick={() => selectChat(chat)}
-                      className={`w-full px-4 py-3 text-left hover:bg-gray-100 flex justify-between items-center
-                        ${selectedChat?.id === chat.id ? "bg-gray-200 font-semibold" : ""}
+                      onClick={() => selectChat(chat)}                      className={`w-full px-3 md:px-4 py-3 text-left hover:bg-red-50 flex justify-between items-center transition-colors
+                        ${selectedChat?.id === chat.id ? "bg-red-50 border-l-4 border-red-500 shadow-sm" : ""}
                       `}
                     >
-                      <div>
-                        <p>{chat.otherUserName || "Unknown"}</p>
-                        <p className="text-xs text-gray-500 truncate max-w-[12rem]">{chat.lastMessage || ''}</p>
+                      <div className="flex items-center gap-3">                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <span className="text-red-600 font-medium">
+                            {chat.otherUserName?.[0]?.toUpperCase() || "U"}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium">{chat.otherUserName || "Unknown"}</p>
+                          <p className="text-xs text-gray-500 truncate max-w-[12rem]">{chat.lastMessage || ''}</p>
+                        </div>
                       </div>
                       {chat.unread && (
-                        <span className="inline-block bg-red-500 text-white rounded-full px-2 text-xs">New</span>
+                        <span className="inline-block bg-red-500 text-white rounded-full px-2 py-1 text-xs">New</span>
                       )}
                     </button>
                   </li>
@@ -498,36 +500,37 @@ const Chat = () => {
               </ul>
             )}
           </div>
-        </div>
-
-        {/* Chat area */}
-        <div className="flex flex-col flex-1">
+        </div>        {/* Chat area */}
+        <div className={`flex flex-col flex-1 ${selectedChat ? 'flex' : 'hidden md:flex'}`}>
           {selectedChat ? (
             <>
-              {/* Chat Header */}
-              <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold">{selectedChat.otherUserName || 'Chat'}</h2>
+              {/* Chat Header */}              <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between bg-gradient-to-r from-red-50 to-white">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSelectedChat(null)}
+                    className="md:hidden p-2 hover:bg-red-100 rounded-full text-red-500 transition-colors"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <h2 className="text-lg font-semibold">{selectedChat.otherUserName || 'Chat'}</h2>
+                </div>
                 {isTyping && (
                   <p className="text-sm text-gray-500 italic">Typing...</p>
                 )}
-              </div>
-
-              {/* Messages */}
-              <div
-                className="flex-1 overflow-y-auto px-6 py-4 space-y-3 bg-gray-50"
+              </div>              {/* Messages */}                <div
+                className="flex-1 overflow-y-auto px-3 md:px-6 py-4 space-y-3 bg-gradient-to-b from-gray-50 to-white"
                 ref={chatContainerRef}
               >
                 {messages.length === 0 ? (
-                  <p className="text-gray-500 text-sm italic">No messages yet.</p>
+                  <p className="text-gray-500 text-sm italic text-center">No messages yet.</p>
                 ) : (
                   messages.map(msg => (
-                    <div
-                      key={`message-${msg.id}`}
+                    <div                      key={`message-${msg.id}`}
                       className={`${
                         msg.sender === auth.currentUser.uid
-                          ? "ml-auto bg-blue-600 text-white"
-                          : "mr-auto bg-white border border-gray-300"
-                      } max-w-xs rounded-lg p-3`}
+                          ? "ml-auto bg-gradient-to-r from-red-500 to-red-600 text-white shadow-md"
+                          : "mr-auto bg-white shadow-md border-l-4 border-red-400"
+                      } max-w-[85%] md:max-w-xs rounded-lg p-3 break-words hover:shadow-lg transition-shadow`}
                     >
                       <p className="text-sm">{msg.text}</p>
                       <p className={`text-xs mt-1 text-right ${
@@ -539,31 +542,30 @@ const Chat = () => {
                   ))
                 )}
                 <div ref={messagesEndRef} />
-              </div>
-
-              {/* Message input */}
-              <form onSubmit={sendMessage} className="flex border-t border-gray-200 p-4 space-x-3 items-center">
+              </div>              {/* Message input */}              <form onSubmit={sendMessage} className="flex border-t border-gray-200 p-3 md:p-4 space-x-2 md:space-x-3 items-center bg-gradient-to-r from-red-50 to-white">
                 <input
                   type="text"
                   value={newMessage}
                   onChange={e => setNewMessage(e.target.value)}
                   onKeyDown={handleTyping}
                   placeholder="Type your message..."
-                  className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 border border-red-200 rounded-lg px-3 md:px-4 py-2 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-red-500 shadow-sm placeholder-red-300"
                 />
                 <button
                   type="submit"
                   disabled={!newMessage.trim()}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-gradient-to-r from-red-500 to-red-600 text-white p-2 md:px-4 md:py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-red-600 hover:to-red-700 transition-all shadow-md hover:shadow-lg"
                 >
                   <Send className="w-5 h-5" />
                 </button>
               </form>
             </>
-          ) : (
-            <div className="flex flex-col items-center justify-center flex-1 text-gray-400 italic">
-              <MessageCircle size={64} />
-              <p className="mt-4">Select a chat or start a new one</p>
+          ) : (            <div className="flex flex-col items-center justify-center flex-1 text-red-400 italic bg-gradient-to-b from-red-50 to-white">
+              <div className="p-8 rounded-full bg-red-100/50 backdrop-blur-sm">
+                <MessageCircle size={64} className="text-red-500" />
+              </div>
+              <p className="mt-4 text-red-500 font-medium">Select a chat or start a new one</p>
+              <p className="text-sm text-red-400 mt-2">Connect with blood donors and help save lives</p>
             </div>
           )}
         </div>

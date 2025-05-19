@@ -104,7 +104,7 @@ const Home = () => {
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
       />
-      <div className="min-h-screen w-full bg-gradient-to-b from-purple-50 to-white">
+      <div className="min-h-screen w-full bg-gradient-to-b from-purple-50 to-white pt-9">
         <div className="w-full px-4 py-20 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
