@@ -334,8 +334,14 @@ const Chat = () => {
       set(ref(database, `userChats/${auth.currentUser.uid}/${chat.id}/unread`), false);
     }
 
+    // Remove any previous listener
+    if (window._chatMessagesUnsubscribe) {
+      window._chatMessagesUnsubscribe();
+    }
+
+    // Real-time listener for messages
     const messagesRef = ref(database, `messages/${chat.id}`);
-    onValue(messagesRef, (snapshot) => {
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         const messagesList = Object.entries(data).map(([key, value]) => ({
@@ -347,6 +353,7 @@ const Chat = () => {
         setMessages([]);
       }
     });
+    window._chatMessagesUnsubscribe = unsubscribe;
   };
 
   // Send message with Socket.IO
