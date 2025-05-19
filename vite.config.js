@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate', // Automatically updates the service worker
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'Flow4Life',
-        short_name: 'F4L',
+        name: 'DonorDash',
+        short_name: 'DD',
         description: 'Find Blood Donors',
         theme_color: '#ffffff',
         icons: [
