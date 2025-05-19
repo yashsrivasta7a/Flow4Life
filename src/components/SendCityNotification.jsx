@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import { getDatabase, ref, onValue, push, set, get } from 'firebase/database';
 import { getMessaging, onMessage, getToken } from 'firebase/messaging';
-import { app } from "../../Utils/Firebase";
 import { toast } from "react-hot-toast";
 
 // For city-based notifications, add this to your RequestForm component
@@ -15,7 +14,6 @@ export const sendCityNotification = async (city, bloodGroup, urgency) => {
     const currentUser = auth.currentUser;
     
     if (!currentUser) return;
-    
     // Get all donors in the same city
     const donorsRef = ref(db, 'donation_requests');
     const snapshot = await get(donorsRef);
@@ -135,11 +133,6 @@ const sendMessage = (e) => {
 
   setNewMessage('');
 };
-
-// Add this to your RequestForm component's onSubmit function
-// After successfully pushing the blood request
-await sendCityNotification(data.city, data.bloodGroupRequired, data.urgency);
-toast.success("Request submitted and notifications sent to donors in your city!");
 
 // Create a NotificationComponent to display notifications
 export const NotificationComponent = () => {
