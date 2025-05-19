@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { getDatabase, ref, onValue, push, set } from 'firebase/database';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { getDatabase, ref, onValue, push, set, get } from 'firebase/database';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -12,8 +12,10 @@ const RequestChats = () => {
   const database = getDatabase();
   const auth = getAuth();
   const [chats, setChats] = useState([]);
+  const [availableRequests, setAvailableRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedChat, setSelectedChat] = useState(null);
+  const [selectedChatData, setSelectedChatData] = useState(null);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,73 +28,153 @@ const RequestChats = () => {
 
     // Listen for user's chats
     const userChatsRef = ref(database, `userChats/${auth.currentUser.uid}`);
-    const unsubscribe = onValue(userChatsRef, (snapshot) => {
+    const unsubscribe = onValue(userChatsRef, async (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        // Convert to array and sort by timestamp
-        const chatsArray = Object.entries(data)
-          .map(([id, chat]) => ({
+        const chatsArray = await Promise.all(Object.entries(data).map(async ([id, chat]) => {
+          if (chat.otherUserId) {
+            try {
+              const userRef = ref(database, `users/${chat.otherUserId}`);
+              const userSnapshot = await get(userRef);
+              
+              if (userSnapshot.exists()) {
+                const userData = userSnapshot.val();
+                chat.otherUserName = userData.name || userData.displayName || userData.email?.split('@')[0] || chat.otherUserName || 'Unknown User';
+              }
+            } catch (error) {
+              console.error('Error fetching user data:', error);
+            }
+          }
+          
+          return {
             id,
             ...chat,
-            isRequester: chat.role === 'requester',
-            isDonor: chat.role === 'donor'
-          }))
-          .sort((a, b) => b.timestamp - a.timestamp);
-        setChats(chatsArray);
+            displayName: chat.otherUserName || chat.requestInfo?.patientName || 'Unknown User'
+          };
+        }));
+
+        const sortedChats = chatsArray.sort((a, b) => b.timestamp - a.timestamp);
+        setChats(sortedChats);
+
+        if (location.state?.activeChatId) {
+          const activeChat = sortedChats.find(chat => chat.id === location.state.activeChatId);
+          if (activeChat) {
+            if (location.state.otherUserName) {
+              activeChat.otherUserName = location.state.otherUserName;
+            }
+            if (location.state.otherUserId) {
+              activeChat.otherUserId = location.state.otherUserId;
+            }
+            handleChatSelect(location.state.activeChatId, activeChat);
+          }
+          window.history.replaceState({}, document.title);
+        }
       } else {
         setChats([]);
       }
       setLoading(false);
     });
 
-    // If there's an activeChatId from navigation, select it
-    if (location.state?.activeChatId) {
-      setSelectedChat(location.state.activeChatId);
-    }
+    // Fetch available blood requests
+    const requestsRef = ref(database, 'blood_requests');
+    const requestsUnsubscribe = onValue(requestsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const requestsArray = Object.entries(data)
+          .map(([id, request]) => ({
+            id,
+            ...request,
+          }))
+          .filter(request => request.userId !== auth.currentUser.uid) // Filter out current user's requests
+          .sort((a, b) => {
+            if (a.urgency === 'emergency' && b.urgency !== 'emergency') return -1;
+            if (a.urgency !== 'emergency' && b.urgency === 'emergency') return 1;
+            return b.timestamp - a.timestamp;
+          });
+        setAvailableRequests(requestsArray);
+      } else {
+        setAvailableRequests([]);
+      }
+    });
 
-    return () => unsubscribe();
-  }, [auth.currentUser, database, navigate]);
+    return () => {
+      unsubscribe();
+      requestsUnsubscribe();
+    };
+  }, [auth.currentUser, database, navigate, location.state]);
 
   // Listen for messages when a chat is selected
   useEffect(() => {
-    if (selectedChat) {
-      const messagesRef = ref(database, `messages/${selectedChat}`);
-      const unsubscribe = onValue(messagesRef, (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          const messagesArray = Object.entries(data)
-            .map(([id, message]) => ({
-              id,
-              ...message,
-              isCurrentUser: message.sender === auth.currentUser.uid
-            }))
-            .sort((a, b) => a.timestamp - b.timestamp);
-          setMessages(messagesArray);
+    if (!selectedChat) return;
 
-          // Mark messages as read if they're not from current user
-          if (auth.currentUser) {
-            const chatRef = ref(database, `userChats/${auth.currentUser.uid}/${selectedChat}`);
-            set(chatRef, { unread: false }, { merge: true });
-          }
-        } else {
-          setMessages([]);
-        }
-      });
+    setMessages([]); // Clear messages when changing chats
+    const messagesRef = ref(database, `messages/${selectedChat}`);
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const messagesList = Object.entries(data)
+          .map(([id, message]) => ({
+            id,
+            ...message,
+            isCurrentUser: message.sender === auth.currentUser.uid
+          }))
+          .sort((a, b) => a.timestamp - b.timestamp);
+        setMessages(messagesList);
+      }
+    });
 
-      return () => unsubscribe();
-    }
+    // Mark chat as read
+    const chatRef = ref(database, `userChats/${auth.currentUser.uid}/${selectedChat}`);
+    set(chatRef, { unread: false }, { merge: true });
+
+    return () => unsubscribe();
   }, [selectedChat, database, auth.currentUser]);
+
+  const handleChatSelect = async (chatId, preloadedChat = null) => {
+    const chat = preloadedChat || chats.find(c => c.id === chatId);
+    if (!chat) return;
+
+    console.log('Selected chat:', chat); // Debug log
+
+    // If we don't have the other user's name, try to fetch it
+    if (chat.otherUserId) {
+      try {
+        const userRef = ref(database, `users/${chat.otherUserId}`);
+        const userSnapshot = await get(userRef);
+        console.log('Selected user data:', userSnapshot.val()); // Debug log
+        
+        if (userSnapshot.exists()) {
+          const userData = userSnapshot.val();
+          chat.otherUserName = userData.name || userData.displayName || userData.email?.split('@')[0] || chat.otherUserName || 'Unknown User';
+        } else {
+          console.log('Selected user not found in database:', chat.otherUserId); // Debug log
+        }
+      } catch (error) {
+        console.error('Error fetching selected user data:', error);
+      }
+    }
+
+    setSelectedChat(chatId);
+    setSelectedChatData(chat);
+    setMessage(''); // Clear message input when changing chats
+
+    // Mark as read when selecting chat
+    const chatRef = ref(database, `userChats/${auth.currentUser.uid}/${chatId}`);
+    set(chatRef, { unread: false }, { merge: true });
+  };
 
   const handleSendMessage = async () => {
     if (!message.trim() || !selectedChat) return;
 
     try {
       const chat = chats.find(c => c.id === selectedChat);
+      const currentUserName = auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Anonymous';
+      
       const newMessage = {
-        text: message,
+        text: message.trim(),
         sender: auth.currentUser.uid,
         timestamp: Date.now(),
-        senderRole: chat.role
+        senderName: currentUserName
       };
 
       // Add message to messages collection
@@ -100,22 +182,32 @@ const RequestChats = () => {
 
       // Update last message in chat
       await set(ref(database, `chats/${selectedChat}/lastMessage`), {
-        text: message,
+        text: message.trim(),
         timestamp: Date.now(),
-        sender: auth.currentUser.uid
+        sender: auth.currentUser.uid,
+        senderName: currentUserName
       });
 
-      // Update last message in both users' chat lists
-      await set(ref(database, `userChats/${auth.currentUser.uid}/${selectedChat}/lastMessage`), message);
-      await set(ref(database, `userChats/${auth.currentUser.uid}/${selectedChat}/timestamp`), Date.now());
-      await set(ref(database, `userChats/${chat.otherUserId}/${selectedChat}/lastMessage`), message);
-      await set(ref(database, `userChats/${chat.otherUserId}/${selectedChat}/timestamp`), Date.now());
-      await set(ref(database, `userChats/${chat.otherUserId}/${selectedChat}/unread`), true);
+      // Update both users' chat lists
+      const updates = {
+        lastMessage: message.trim(),
+        timestamp: Date.now()
+      };
 
+      await set(ref(database, `userChats/${auth.currentUser.uid}/${selectedChat}`), 
+        { ...chat, ...updates }, { merge: true });
+      
+      if (chat.otherUserId) {
+        await set(ref(database, `userChats/${chat.otherUserId}/${selectedChat}`), 
+          { ...chat, ...updates, unread: true }, { merge: true });
+      }
+
+      // Clear the message input
       setMessage('');
+
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error('Failed to send message');
+      toast.error('Failed to send message: ' + error.message);
     }
   };
 
