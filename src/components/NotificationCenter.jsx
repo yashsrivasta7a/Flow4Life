@@ -30,7 +30,7 @@ const NotificationCenter = () => {
             
             // Show toast for new notifications
             notifList.forEach(notif => {
-              if (!notif.toastDisplayed) {
+              if (!notif.read) {
                 console.log('[NotificationCenter] Showing toast for notification:', notif);
                 toast(notif.title, {
                   description: notif.body,
@@ -39,8 +39,7 @@ const NotificationCenter = () => {
                     onClick: () => markAsRead(notif.id)
                   },
                 });
-                
-                // Mark as toast displayed
+                // Optionally update toastDisplayed, but not required for this logic
                 update(ref(db, `notifications/${user.uid}/${notif.id}`), {
                   toastDisplayed: true
                 });
