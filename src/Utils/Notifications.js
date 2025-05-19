@@ -19,7 +19,7 @@ export const sendChatNotification = async (recipientId, message, senderName) => 
         
         // Store notification in database
         const notificationsRef = ref(db, `notifications/${recipientId}`);
-        await push(notificationsRef, {
+        const notifPushResult = await push(notificationsRef, {
           title: `New message from ${senderName}`,
           body: message.length > 50 ? message.substring(0, 50) + '...' : message,
           timestamp: Date.now(),
@@ -28,6 +28,7 @@ export const sendChatNotification = async (recipientId, message, senderName) => 
           senderId: getAuth().currentUser.uid,
           senderName
         });
+        console.log(`[Notifications.js] Notification pushed to DB for ${recipientId}:`, notifPushResult.key);
         
         // Send notification via socket.io for real-time delivery
         if (typeof window !== 'undefined') {
@@ -40,7 +41,7 @@ export const sendChatNotification = async (recipientId, message, senderName) => 
               senderName,
               timestamp: Date.now()
             };
-            console.log('[Socket.IO] Emitting send-message:', payload);
+            console.log('[Notifications.js] Emitting send-message via socket:', payload);
             socket.emit('send-message', payload);
           });
         }

@@ -17,6 +17,7 @@ const NotificationCenter = () => {
         
         const notificationListener = onValue(notificationsRef, (snapshot) => {
           const data = snapshot.val();
+          console.log('[NotificationCenter] Notifications fetched:', data);
           if (data) {
             const notifList = Object.entries(data).map(([key, value]) => ({
               id: key,
@@ -30,6 +31,7 @@ const NotificationCenter = () => {
             // Show toast for new notifications
             notifList.forEach(notif => {
               if (!notif.toastDisplayed) {
+                console.log('[NotificationCenter] Showing toast for notification:', notif);
                 toast(notif.title, {
                   description: notif.body,
                   action: {

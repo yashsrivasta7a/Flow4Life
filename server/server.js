@@ -26,9 +26,11 @@ io.on('connection', (socket) => {
 
   // Listen for new messages and send notification to the receiver
   socket.on('send-message', (data) => {
+    console.log('[server.js] send-message received:', data);
     // data: { text, senderId, receiverId, senderName, timestamp }
     // Join the receiver to their own room if not already
     if (data.receiverId) {
+      console.log(`[server.js] Emitting notification to room: ${data.receiverId}`);
       io.to(data.receiverId).emit('notification', {
         title: `Message from ${data.senderName || 'User'}`,
         body: data.text,
@@ -42,7 +44,7 @@ io.on('connection', (socket) => {
   socket.on('join', (userId) => {
     if (userId) {
       socket.join(userId);
-      console.log(`Socket ${socket.id} joined room ${userId}`);
+      console.log(`[server.js] Socket ${socket.id} joined room ${userId}`);
     }
   });
 
