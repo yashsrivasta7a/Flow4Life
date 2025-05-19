@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { getAuth } from 'firebase/auth';
 import Signuppage from './Pages/signup/Signuppage';
 import Signinpage from './Pages/signin/Signinpage';
 import Home from './Pages/Home/Home';
@@ -21,6 +22,8 @@ import RequestChats from './Pages/BloodRequests/RequestChats';
 import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import Chatbot from './components/Chatbot';
+import { subscribeToPushNotifications, saveSubscriptionToServer } from './serviceWorkerRegistraton';
+import NotificationsPage from './Pages/Notifications/NotificationsPage';
 
 function AppContent() {
   const location = useLocation();
@@ -43,6 +46,7 @@ function AppContent() {
               <Route path="/signup" element={<Signuppage />} />
               <Route path="/learn-more" element={<LearnMore />} />
               <Route path="/chatbot" element={<Chatbot />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
 
               {/* Protected Routes */}
               <Route
@@ -162,6 +166,8 @@ function AppContent() {
 
 // App wrapper for Router
 function App() {
+ 
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker
       .register('/firebase-messaging-sw.js')

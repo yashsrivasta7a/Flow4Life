@@ -5,6 +5,7 @@ import { Droplet, Calendar, ClipboardCheck, MapPin, Phone, Heart, AlertCircle, U
 import { getAuth } from 'firebase/auth';
 import { getDatabase, ref, get } from 'firebase/database';
 import { toast } from 'react-hot-toast';
+import { MdEmail } from 'react-icons/md';
 
 const DonorHome = () => {
   const navigate = useNavigate();
@@ -212,14 +213,16 @@ const DonorHome = () => {
           <p className="text-gray-600 mb-8">
             Our team is here to help you with any questions about blood donation.
           </p>
-          <div className="flex items-center justify-center gap-3">
-            <MapPin className="w-6 h-6 text-red-600" />
-            <span className="text-gray-700">Find Donation Centers Near You</span>
-          </div>
+         <div className="flex items-center justify-center gap-3">
+  <MdEmail className="w-6 h-6 text-red-600" />
+  <span className="text-gray-700">
+    Email us at <a href="mailto:flow4life.info@gmail.com" className="text-blue-600 underline">flow4life.info@gmail.com</a>
+  </span>
+</div>
         </div>
       </section>
     </div>
   );
 };
 
-export default DonorHome; 
+export default DonorHome;

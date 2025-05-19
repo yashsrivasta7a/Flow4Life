@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom'; // <-- add useNavigate here
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Menu, X, User, LogOut, Heart, MessageCircle } from 'lucide-react';
 
 const Navbar = ({ user, onLogout, notifications, showNotifications, setShowNotifications, menuOpen, setMenuOpen }) => {
   const location = useLocation();
+  const navigate = useNavigate(); // <-- add this line
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -20,6 +21,8 @@ const Navbar = ({ user, onLogout, notifications, showNotifications, setShowNotif
     { name: 'Find Donor', path: '/finddonor' },
     { name: 'Donate', path: '/donate' },
     { name: 'Chats', path: '/chats' },
+    { name: 'Notifications', path: '/notifications' },
+    { name: 'Profile', path: `/profile/${user?.uid}` },
   ];
 
   return (
@@ -59,8 +62,9 @@ const Navbar = ({ user, onLogout, notifications, showNotifications, setShowNotif
               <>
                 {/* Notifications */}
                 <button
-                  onClick={() => setShowNotifications(!showNotifications)}
+                  onClick={() => navigate("/notifications")}
                   className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  aria-label="Notifications"
                 >
                   <Bell className="w-5 h-5 text-gray-600" />
                   {notifications?.length > 0 && (
