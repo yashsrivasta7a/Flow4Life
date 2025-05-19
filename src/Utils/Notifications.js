@@ -29,6 +29,22 @@ export const sendChatNotification = async (recipientId, message, senderName) => 
           senderName
         });
         
+        // Send notification via socket.io for real-time delivery
+        if (typeof window !== 'undefined') {
+          // Only run in browser
+          import('../Utils/socket').then(({ default: socket }) => {
+            const payload = {
+              text: message,
+              senderId: getAuth().currentUser.uid,
+              receiverId: recipientId,
+              senderName,
+              timestamp: Date.now()
+            };
+            console.log('[Socket.IO] Emitting send-message:', payload);
+            socket.emit('send-message', payload);
+          });
+        }
+        
         console.log(`Notification stored in database for ${recipientId}`);
       } else {
         console.log(`No FCM token found for user ${recipientId}`);

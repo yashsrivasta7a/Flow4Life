@@ -63,6 +63,7 @@ const Chat = () => {
 
     // Listen for incoming messages (real-time chat updates)
     socket.on("receive-message", (data) => {
+      console.log("[Socket] receive-message event:", data);
       // If the message is for the current user and not in the active chat, show notification
       if (
         data.receiverId === user.uid &&
@@ -107,6 +108,7 @@ const Chat = () => {
 
     // Listen for chat notifications
     socket.on("notification", (data) => {
+      console.log("[Socket] notification event:", data);
       const { title, body, url, receiverId } = data;
       if (user && receiverId === user.uid) {
         showNotification(title, {
