@@ -213,7 +213,7 @@ const socket = io('http://localhost:4000');
   return (
     <Router>
       <AppContent />
-        <h1>Socket.IO Notification Demo</h1>
+        
     </Router>
   );
 }
