@@ -63,6 +63,7 @@ const Chat = () => {
 
     // Listen for incoming messages (real-time chat updates)
     socket.on("receive-message", (data) => {
+      console.log("[Chat.jsx] receive-message event:", data);
       // If the message is for the current user and not in the active chat, show notification
       if (
         data.receiverId === user.uid &&
@@ -70,22 +71,13 @@ const Chat = () => {
       ) {
         // Toast notification (in-app)
         toast.success(`New message from ${data.senderName || "User"}`);
-        
         // Browser notification
         if (notificationsEnabled) {
           showNotification(
             `Message from ${data.senderName || "User"}`,
-            data.text,
-            () => {
-              // Find the chat with this sender and open it when clicked
-              const chatWithSender = chats.find(chat => chat.otherUserId === data.senderId);
-              if (chatWithSender) {
-                selectChat(chatWithSender);
-              }
-            }
+            { body: data.text }
           );
         }
-        
         // Update unread status in chats list
         setChats((prevChats) =>
           prevChats.map((chat) =>
@@ -95,30 +87,16 @@ const Chat = () => {
           )
         );
       }
-      
-      // If the message is for the current chat, append it
-      if (
-        selectedChat &&
-        ((data.senderId === selectedChat.otherUserId && data.receiverId === user.uid) ||
-         (data.senderId === user.uid && data.receiverId === selectedChat.otherUserId))
-      ) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: data.id || Date.now(),
-            text: data.text,
-            sender: data.senderId,
-            senderName: data.senderName,
-            timestamp: data.timestamp,
-          },
-        ]);
-      }
+      // Do NOT append the message to the chat UI here; real-time updates come from Firebase listener.
     });
 
     // Listen for chat notifications
     socket.on("notification", (data) => {
+      console.log("[Chat.jsx] notification event:", data);
+      console.log("[Socket] notification event:", data);
       const { title, body, url, receiverId } = data;
       if (user && receiverId === user.uid) {
+        console.log("[Chat.jsx] Showing browser notification for:", title, body);
         showNotification(title, {
           body,
           icon: '/notification-icon.png',
@@ -126,7 +104,6 @@ const Chat = () => {
         });
       }
     });
-
     return () => {
       socket.off("receive-message");
       socket.off("notification");
@@ -326,6 +303,9 @@ const Chat = () => {
     }
   };
 
+  // Store unsubscribe function in a ref to avoid memory leaks and duplicate listeners
+  const chatMessagesUnsubscribeRef = useRef(null);
+
   // Select chat, fetch messages and mark read
   const selectChat = (chat) => {
     if (!chat || !chat.id) {
@@ -339,8 +319,14 @@ const Chat = () => {
       set(ref(database, `userChats/${auth.currentUser.uid}/${chat.id}/unread`), false);
     }
 
+    // Remove any previous listener
+    if (chatMessagesUnsubscribeRef.current) {
+      chatMessagesUnsubscribeRef.current();
+    }
+
+    // Real-time listener for messages
     const messagesRef = ref(database, `messages/${chat.id}`);
-    onValue(messagesRef, (snapshot) => {
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         const messagesList = Object.entries(data).map(([key, value]) => ({
@@ -352,7 +338,17 @@ const Chat = () => {
         setMessages([]);
       }
     });
+    chatMessagesUnsubscribeRef.current = unsubscribe;
   };
+
+  // Clean up message listener on unmount
+  useEffect(() => {
+    return () => {
+      if (chatMessagesUnsubscribeRef.current) {
+        chatMessagesUnsubscribeRef.current();
+      }
+    };
+  }, []);
 
   // Send message with Socket.IO
   const sendMessage = (e) => {
