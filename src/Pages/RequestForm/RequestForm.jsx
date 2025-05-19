@@ -100,16 +100,23 @@ const RequestForm = ({ emergency = false }) => {
 
             // Send notifications to matching donors
             await checkAndSendMatchingRequests(requestData);
+            
+            // Send city-based notifications if it's an emergency
+            if (emergency) {
+                await sendCityNotification(formData.city, formData.bloodType);
+            }
 
-            toast.success("Blood request submitted and notifications sent!");
-
-            // Navigate to FindDonor page with request details
-            navigate('/finddonor', { 
-                state: { 
+            toast.success("Blood request submitted successfully!");
+            
+            // Navigate to FindDonor with full request details
+            navigate('/find-donor', { 
+                state: {
                     requestId: newRequestRef.key,
                     bloodType: formData.bloodType,
-                    isEmergency: emergency,
-                    location: userLocation
+                    city: formData.city,
+                    location: userLocation,
+                    emergency: emergency,
+                    timestamp: Date.now()
                 }
             });
 

@@ -13,7 +13,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   
   const R = 6371; // Radius of the earth in km
   const dLat = deg2rad(lat2 - lat1);
-  const dLon = deg2rad(lon2 - lon1);
+  const dLon = deg2rad(lat2 - lon1);
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
@@ -41,9 +41,17 @@ const FindDonor = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [userCity, setUserCity] = useState(null);
 
-  const requestDetails = location.state || {};
+  // Extract request details with fallbacks
+  const requestDetails = {
+    bloodType: location.state?.bloodType || '',
+    city: location.state?.city || '',
+    location: location.state?.location || null,
+    emergency: location.state?.emergency || false,
+    timestamp: location.state?.timestamp || Date.now(),
+    requestId: location.state?.requestId || null
+  };
 
-  // Get user's location and city
+  // If no state was passed, try to get user's current location
   useEffect(() => {
     const getUserLocation = async () => {
       try {
@@ -64,14 +72,15 @@ const FindDonor = () => {
         if (position) {
           const { latitude, longitude } = position.coords;
           setUserLocation({ latitude, longitude });
-
-          // Get city name using our utility function
+          
+          // Get city name
           const cityName = await getCityFromCoordinates(latitude, longitude);
           if (cityName) {
             setUserCity(cityName);
-            console.log('Detected city:', cityName); // Debug log
-          } else {
-            console.log('Could not detect city from coordinates'); // Debug log
+            // If we don't have a city from request details, use the detected one
+            if (!requestDetails.city) {
+              requestDetails.city = cityName;
+            }
           }
         }
       } catch (error) {
@@ -81,7 +90,7 @@ const FindDonor = () => {
     };
 
     getUserLocation();
-  }, [requestDetails]);
+  }, []);
 
   useEffect(() => {
     const donorsRef = ref(database, "donation_requests");
@@ -89,7 +98,6 @@ const FindDonor = () => {
 
     onValue(donorsQuery, (snapshot) => {
       const data = snapshot.val();
-      console.log("Raw donor data:", data); // Debug log
       if (data) {
         let donorsArray = Object.entries(data).map(([id, details]) => ({
           id,
@@ -106,35 +114,44 @@ const FindDonor = () => {
 
         // Store all donors before filtering
         setAllDonors(donorsArray);
-        console.log("All donors:", donorsArray); // Debug log
 
         // Apply filters only if not showing all donors
         if (!showAllDonors) {
-          // Filter out unavailable donors and check blood type compatibility
-          donorsArray = donorsArray.filter(donor => {
-            // First check if donor is available
-            if (donor.status === 'unavailable') return false;
-            
-            // Then check blood type compatibility
-            if (!requestDetails.bloodType) return true;
-            return isBloodCompatible(requestDetails.bloodType, donor.bloodType);
-          });
+          // Filter out unavailable donors
+          donorsArray = donorsArray.filter(donor => donor.status !== 'unavailable');
 
-          // Sort by location - always prioritize same city and nearest donors
+          // Apply blood type filter only if we have a requested blood type
+          if (requestDetails.bloodType) {
+            donorsArray = donorsArray.filter(donor => 
+              isBloodCompatible(requestDetails.bloodType, donor.bloodType)
+            );
+          }
+
+          // Sort by location if available
           if (userLocation) {
             donorsArray.sort((a, b) => {
               // First, prioritize donors in the same city
               if (a.isInSameCity && !b.isInSameCity) return -1;
               if (!a.isInSameCity && b.isInSameCity) return 1;
               
-              // Then sort by distance (nearest first)
-              const distanceA = a.distance === Infinity ? Number.MAX_VALUE : a.distance;
-              const distanceB = b.distance === Infinity ? Number.MAX_VALUE : b.distance;
-              return distanceA - distanceB;
+              // Then sort by distance
+              return (a.distance === Infinity ? Number.MAX_VALUE : a.distance) 
+                     - (b.distance === Infinity ? Number.MAX_VALUE : b.distance);
+            });
+          }
+
+          // If it's an emergency request, prioritize donors who are currently online
+          if (requestDetails.emergency) {
+            donorsArray.sort((a, b) => {
+              const aOnline = a.lastActive && (Date.now() - a.lastActive < 300000); // 5 minutes
+              const bOnline = b.lastActive && (Date.now() - b.lastActive < 300000);
+              if (aOnline && !bOnline) return -1;
+              if (!aOnline && bOnline) return 1;
+              return 0;
             });
           }
         }
-        console.log("Filtered donors:", donorsArray); // Debug log
+
         setDonors(donorsArray);
       }
       setLoading(false);

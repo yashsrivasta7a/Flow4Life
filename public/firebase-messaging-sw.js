@@ -1,34 +1,44 @@
 
-// importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
-// importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
 
-// const firebaseConfig = {
-//     apiKey: "AIzaSyD_9kApMf_AotAlYwvSmgY_hd9cOaFsWx0",
-//     authDomain: "flow4life.firebaseapp.com",
-//     projectId: "flow4life",
-//     storageBucket: "flow4life.firebasestorage.app",
-//     messagingSenderId: "360337861795",
-//     appId: "1:360337861795:web:1eace881dd5ef5c0762316",
-// };
+const firebaseConfig = {
+    apiKey: "AIzaSyD_9kApMf_AotAlYwvSmgY_hd9cOaFsWx0",
+    authDomain: "flow4life.firebaseapp.com",
+    projectId: "flow4life",
+    storageBucket: "flow4life.firebasestorage.app",
+    messagingSenderId: "360337861795",
+    appId: "1:360337861795:web:1eace881dd5ef5c0762316",
+    databaseURL:"https://flow4life-default-rtdb.firebaseio.com/"
+};
 
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
 
-// // Retrieve an instance of Firebase Messaging so that it can handle background messages.
-// const messaging = firebase.messaging();
+// Retrieve an instance of Firebase Messaging so that it can handle background messages.
+const messaging = firebase.messaging();
 
-// // Handle background messages
-// messaging.onBackgroundMessage((payload) => {
-//   console.log('[firebase-messaging-sw.js] Received background message ', payload);
+// Handle background messages
+messaging.onBackgroundMessage((payload) => {
+  console.log('[firebase-messaging-sw.js] Received background message ', payload);
   
-//   const notificationTitle = payload.notification.title;
-//   const notificationOptions = {
-//     body: payload.notification.body,
-//     icon: '/blood.png',
-//     badge: '/blood.png',
-//     data: payload.data
-//   };
+  const notificationTitle = payload.notification.title;
+  const notificationOptions = {
+    body: payload.notification.body,
+    icon: '/blood.png',
+    badge: '/blood.png',
+    data: payload.data,
+    requireInteraction: true,
+    actions: [
+      {
+        action: 'open',
+        title: 'Open Chat'
+      }
+    ]
+  };
 
-//   self.registration.showNotification(notificationTitle, notificationOptions);
-// });
+  self.registration.showNotification(notificationTitle, notificationOptions);
+});
 
 // // Handle notification click
 // self.addEventListener('notificationclick', (event) => {
