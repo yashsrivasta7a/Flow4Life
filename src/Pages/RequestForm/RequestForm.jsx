@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { AlertCircle, Clock, MapPin } from 'lucide-react';
 import Navbar from '../../components/Navbar';
+import { sendCityNotification } from '../../components/SendCityNotification';
 
 const RequestForm = ({ emergency = false }) => {
     const navigate = useNavigate();
@@ -96,7 +97,10 @@ const RequestForm = ({ emergency = false }) => {
             const newRequestRef = push(ref(database, 'blood_requests'));
             await set(newRequestRef, requestData);
 
-            toast.success("Blood request submitted successfully!");
+            // Send notification to donors with same city and blood group
+            await sendCityNotification(formData.city, formData.bloodType, formData.urgency);
+
+            toast.success("Blood request submitted and notifications sent!");
 
             // Navigate to FindDonor page with request details
             navigate('/finddonor', { 
