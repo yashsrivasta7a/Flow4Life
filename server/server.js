@@ -27,13 +27,23 @@ io.on('connection', (socket) => {
   // Listen for new messages and send notification to the receiver
   socket.on('send-message', (data) => {
     // data: { text, senderId, receiverId, senderName, timestamp }
-    // Emit notification to the receiver only
-    io.emit('notification', {
-      title: `Message from ${data.senderName || 'User'}`,
-      body: data.text,
-      url: `/chats?selected=${data.senderId}`,
-      receiverId: data.receiverId
-    });
+    // Join the receiver to their own room if not already
+    if (data.receiverId) {
+      io.to(data.receiverId).emit('notification', {
+        title: `Message from ${data.senderName || 'User'}`,
+        body: data.text,
+        url: `/chats?selected=${data.senderId}`,
+        receiverId: data.receiverId
+      });
+    }
+  });
+
+  // Listen for join events to add users to their own room
+  socket.on('join', (userId) => {
+    if (userId) {
+      socket.join(userId);
+      console.log(`Socket ${socket.id} joined room ${userId}`);
+    }
   });
 
   socket.on('disconnect', () => {

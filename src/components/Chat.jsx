@@ -70,22 +70,13 @@ const Chat = () => {
       ) {
         // Toast notification (in-app)
         toast.success(`New message from ${data.senderName || "User"}`);
-        
         // Browser notification
         if (notificationsEnabled) {
           showNotification(
             `Message from ${data.senderName || "User"}`,
-            data.text,
-            () => {
-              // Find the chat with this sender and open it when clicked
-              const chatWithSender = chats.find(chat => chat.otherUserId === data.senderId);
-              if (chatWithSender) {
-                selectChat(chatWithSender);
-              }
-            }
+            { body: data.text }
           );
         }
-        
         // Update unread status in chats list
         setChats((prevChats) =>
           prevChats.map((chat) =>
@@ -95,7 +86,6 @@ const Chat = () => {
           )
         );
       }
-      
       // If the message is for the current chat, append it
       if (
         selectedChat &&
