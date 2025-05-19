@@ -104,7 +104,6 @@ const Chat = () => {
         });
       }
     });
-
     return () => {
       socket.off("receive-message");
       socket.off("notification");
