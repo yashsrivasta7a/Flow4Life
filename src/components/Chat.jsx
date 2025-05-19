@@ -82,18 +82,9 @@ const Chat = () => {
               if (chatWithSender) {
                 selectChat(chatWithSender);
               }
-            },
-            // Additional data to pass to the service worker
-            { 
-              chatId: chats.find(chat => chat.otherUserId === data.senderId)?.id,
-              senderId: data.senderId,
-              messageId: data.id
             }
           );
         }
-        
-        // Add notification sound
-        playNotificationSound();
         
         // Update unread status in chats list
         setChats((prevChats) =>
@@ -128,17 +119,6 @@ const Chat = () => {
       socket.off("receive-message");
     };
   }, [user, selectedChat, chats, notificationsEnabled]);
-  
-  // Notification sound player
-  const playNotificationSound = () => {
-    try {
-      const audio = new Audio('/notification-sound.mp3');
-      audio.volume = 0.5;
-      audio.play().catch(err => console.log('Audio playback error:', err));
-    } catch (err) {
-      console.error('Could not play notification sound:', err);
-    }
-  };
 
   // Typing indicator handler
   const handleTyping = () => {
@@ -419,26 +399,6 @@ const Chat = () => {
     
     if (hasPermission) {
       toast.success("Notifications enabled successfully");
-      
-      // Register for push notifications with the server
-      const auth = getAuth(app);
-      if (auth.currentUser) {
-        try {
-          // Get current subscription
-          const registration = await navigator.serviceWorker.ready;
-          const subscription = await registration.pushManager.getSubscription();
-          
-          if (subscription) {
-            // Save subscription to database for this user
-            const subscriptionRef = ref(database, `userSubscriptions/${auth.currentUser.uid}`);
-            await set(subscriptionRef, JSON.stringify(subscription));
-            
-            console.log("Push subscription saved to database");
-          }
-        } catch (error) {
-          console.error("Error saving push subscription:", error);
-        }
-      }
     } else {
       toast.error("Failed to enable notifications. Please check your browser settings.");
     }
