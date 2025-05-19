@@ -61,7 +61,7 @@ const Chat = () => {
     // Join user's room for private messages
     socket.emit("join", user.uid);
 
-    // Listen for incoming messages
+    // Listen for incoming messages (real-time chat updates)
     socket.on("receive-message", (data) => {
       // If the message is for the current user and not in the active chat, show notification
       if (
@@ -115,8 +115,21 @@ const Chat = () => {
       }
     });
 
+    // Listen for chat notifications
+    socket.on("notification", (data) => {
+      const { title, body, url, receiverId } = data;
+      if (user && receiverId === user.uid) {
+        showNotification(title, {
+          body,
+          icon: '/notification-icon.png',
+          data: { url },
+        });
+      }
+    });
+
     return () => {
       socket.off("receive-message");
+      socket.off("notification");
     };
   }, [user, selectedChat, chats, notificationsEnabled]);
 

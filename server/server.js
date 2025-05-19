@@ -15,14 +15,26 @@ const io = new SocketIo(server, {
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
-  // Example: Send a notification after 5 seconds
-  setTimeout(() => {
-    socket.emit('notification', {
-      title: 'Hello!',
-      body: 'This is a test notification.',
-      url: 'https://example.com/chat',
+  // Remove the test notification
+  // setTimeout(() => {
+  //   socket.emit('notification', {
+  //     title: 'Hello!',
+  //     body: 'This is a test notification.',
+  //     url: 'https://example.com/chat',
+  //   });
+  // }, 5000);
+
+  // Listen for new messages and send notification to the receiver
+  socket.on('send-message', (data) => {
+    // data: { text, senderId, receiverId, senderName, timestamp }
+    // Emit notification to the receiver only
+    io.emit('notification', {
+      title: `Message from ${data.senderName || 'User'}`,
+      body: data.text,
+      url: `/chats?selected=${data.senderId}`,
+      receiverId: data.receiverId
     });
-  }, 5000);
+  });
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);

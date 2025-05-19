@@ -22,10 +22,9 @@ import RequestChats from './Pages/BloodRequests/RequestChats';
 import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import Chatbot from './components/Chatbot';
-import  { useEffect } from 'react';
 import io from 'socket.io-client';
 import { requestNotificationPermission, showNotification } from './Utils/NotificationSystem';
-
+import NotificationsPage from "../src/Pages/Notifications/NotificationsPage"
 
 function AppContent() {
   const location = useLocation();
@@ -190,12 +189,17 @@ const socket = io('http://localhost:4000');
 
     // Listen for 'notification' events from the server
     socket.on('notification', (data) => {
-      const { title, body, url } = data;
-      showNotification(title, {
-        body,
-        icon: '/notification-icon.png',
-        data: { url },
-      });
+      const { title, body, url, receiverId } = data;
+      // Only show notification if the current user is the receiver
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (user && receiverId === user.uid) {
+        showNotification(title, {
+          body,
+          icon: '/notification-icon.png',
+          data: { url },
+        });
+      }
     });
 
     // Cleanup on unmount
