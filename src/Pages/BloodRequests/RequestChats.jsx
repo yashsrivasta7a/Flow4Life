@@ -53,13 +53,6 @@ const RequestChats = () => {
     const setupNotifications = async () => {
       const hasPermission = await requestNotificationPermission();
       setNotificationsEnabled(hasPermission);
-      
-      if (!hasPermission) {
-        toast.info("Enable notifications for a better chat experience", {
-          duration: 5000,
-          icon: '🔔',
-        });
-      }
     };
     
     setupNotifications();

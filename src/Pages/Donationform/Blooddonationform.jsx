@@ -45,7 +45,7 @@ const SuccessModal = ({ isOpen, onClose }) => {
                 onClick={onClose}
                 className="bg-red-600 text-white px-6 py-3 rounded-full font-semibold hover:bg-red-700 transition-colors"
               >
-                Continue to Home
+                Continue
               </button>
             </div>
           </motion.div>
@@ -61,8 +61,9 @@ const BloodDonationForm = () => {
   const database = getDatabase();
   const [loading, setLoading] = useState(true);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [lastDonationDate, setLastDonationDate] = useState(null);
 
-  // Check if user is already registered as donor
+  // Check if user is already registered as donor and validate 7-day cooling period
   useEffect(() => {
     const checkDonorStatus = async () => {
       try {
@@ -73,18 +74,47 @@ const BloodDonationForm = () => {
           return;
         }
 
-        const donorRef = ref(database, `donation_requests/${user.uid}`);
-        const snapshot = await get(donorRef);
+        // Check both user profile and donation requests
+        const [userSnapshot, donorSnapshot] = await Promise.all([
+          get(ref(database, `users/${user.uid}`)),
+          get(ref(database, `donation_requests/${user.uid}`))
+        ]);
 
-        if (snapshot.exists()) {
-          // User is already registered as a donor, redirect to blood requests
-          toast.success("Welcome back! Here are the current blood requests.", {
-            duration: 3000,
-            icon: '❤️'
-          });
-          navigate('/blood-requests');
-          return;
+        let existingData = {};
+        
+        if (userSnapshot.exists()) {
+          const userData = userSnapshot.val();
+          existingData = {
+            ...existingData,
+            name: userData.name || '',
+            email: user.email,
+            phone: userData.phone || '',
+            city: userData.city || ''
+          };
         }
+
+        if (donorSnapshot.exists()) {
+          const donorData = donorSnapshot.val();
+          const lastDonation = donorData.lastDonation ? new Date(donorData.lastDonation) : null;
+          setLastDonationDate(lastDonation);
+          
+          existingData = {
+            ...existingData,
+            bloodType: donorData.bloodType || '',
+            gender: donorData.gender || '',
+            age: donorData.age || '',
+            weight: donorData.weight || ''
+          };
+
+          // Removed 7-day cooling period check
+        }
+
+        // Pre-fill form with existing data
+        setFormData(prev => ({
+          ...prev,
+          ...existingData
+        }));
+
         setLoading(false);
       } catch (error) {
         console.error('Error checking donor status:', error);
@@ -259,6 +289,9 @@ const BloodDonationForm = () => {
       return;
     }
 
+    // Check for 7-day cooling period if this is a repeat donation
+    // Removed 7-day cooling period check
+
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -278,16 +311,15 @@ const BloodDonationForm = () => {
         lastUpdated: Date.now()
       };
 
-      // Create donation request data
+      // Create donation request data with current timestamp as lastDonation
       const donationRequestData = {
         userId: user.uid,
         name: formData.name,
         bloodType: formData.bloodType,
         city: formData.city,
-        lastDonation: formData.lastDonation || '',
+        lastDonation: Date.now(), // Set the current timestamp as last donation date
         status: 'available',
         timestamp: Date.now(),
-        // email is NOT stored here, but in users node
       };
 
       // Update both nodes
@@ -327,7 +359,7 @@ const BloodDonationForm = () => {
 
   const handleModalClose = () => {
     setShowSuccessModal(false);
-    navigate('/blood-requests');
+    navigate('/donor');
   };
 
   return (
@@ -350,18 +382,41 @@ const BloodDonationForm = () => {
               {/* Personal Information */}
               <div className="space-y-6 bg-gray-50 p-6 rounded-xl border border-gray-100">
                 <h2 className="text-xl font-semibold text-gray-900">Personal Information</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-              <input
-                type="text"
-                      name="name"
-                      required
-                      className="input"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                    />
+                {/* Show existing user info in a summary card if available */}
+                {(formData.name || formData.email) && (
+                  <div className="bg-red-50 p-4 rounded-lg mb-6 border border-red-100">
+                    <h3 className="text-lg font-semibold text-red-800 mb-3">Your Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {formData.name && (
+                        <div className="flex flex-col">
+                          <span className="text-sm text-red-600">Name</span>
+                          <span className="font-medium text-gray-900">{formData.name}</span>
+                        </div>
+                      )}
+                      {formData.email && (
+                        <div className="flex flex-col">
+                          <span className="text-sm text-red-600">Email</span>
+                          <span className="font-medium text-gray-900">{formData.email}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {!formData.name && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                      <input
+                        type="text"
+                        name="name"
+                        required
+                        className="input"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
                     <select
@@ -401,54 +456,58 @@ const BloodDonationForm = () => {
                       value={formData.weight}
                       onChange={handleInputChange}
                     />
-            </div>
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Blood Type</label>
-              <select
+                    <select
                       name="bloodType"
                       required
-                      className="input"
+                      className={`input ${formData.bloodType ? 'bg-gray-50' : ''}`}
                       value={formData.bloodType}
                       onChange={handleInputChange}
+                      disabled={!!formData.bloodType}
                     >
                       <option value="">Select Blood Type</option>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
                       <option value="AB+">AB+</option>
                       <option value="AB-">AB-</option>
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
-              </select>
-            </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Last Donation Date</label>
-                    <div className="relative">
-              <input
-                        type="date"
-                        name="lastDonation"
-                        className="input"
-                        value={formData.lastDonation}
-                        onChange={handleInputChange}
-                      />
-                      <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                    </select>
+                  </div>
+                  {!lastDonationDate && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Last Donation Date</label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          name="lastDonation"
+                          className="input"
+                          value={formData.lastDonation}
+                          onChange={handleInputChange}
+                        />
+                        <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                      </div>
                     </div>
-            </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-              <input
+                    <input
                       type="tel"
                       name="phone"
                       required
-                      className="input"
+                      className={`input ${formData.phone ? 'bg-gray-50' : ''}`}
                       value={formData.phone}
                       onChange={handleInputChange}
-              />
-            </div>
+                      disabled={!!formData.phone}
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
-              <input
+                    <input
                       type="text"
                       name="city"
                       required
@@ -457,6 +516,21 @@ const BloodDonationForm = () => {
                       onChange={handleInputChange}
                     />
                   </div>
+                  
+                  {/* Show last donation info if it exists */}
+                  {lastDonationDate && (
+                    <div className="md:col-span-2">
+                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <div className="flex items-start gap-3">
+                          <Calendar className="w-5 h-5 text-blue-500 mt-0.5" />
+                          <div>
+                            <p className="font-medium text-blue-800">Last Donation</p>
+                            <p className="text-blue-600">{new Date(lastDonationDate).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -541,7 +615,7 @@ const BloodDonationForm = () => {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.95 }}
                   type="submit"
-                  className="btn btn-primary w-full max-w-md"
+                   className="btn w-full max-w-md bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-full transition-colors duration-200 shadow-md hover:shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
                   disabled={!isEligible()}
                 >
                   Register as Donor

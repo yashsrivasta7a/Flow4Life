@@ -142,11 +142,9 @@ const Home = () => {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
-            {/* Donor Card */}
-            <motion.div
-              whileHover={{ scale: 1.02 }}
+            {/* Donor Card */}            <motion.div              whileHover={{ scale: 1.02 }}
               className="bg-gradient-to-br from-red-50 to-red-100 p-8 rounded-2xl shadow-soft hover:shadow-lg transition-all cursor-pointer h-full"
-              onClick={() => handleAuthAction('/donor', 'donor')}
+              onClick={() => handleAuthAction('/donation-form', 'donor')}
             >
               <div className="flex justify-center mb-6">
                 <Heart className="w-16 h-16 text-red-500" />

@@ -109,7 +109,7 @@ const RequestForm = ({ emergency = false }) => {
             toast.success("Blood request submitted successfully!");
             
             // Navigate to FindDonor with full request details
-            navigate('/find-donor', { 
+            navigate('/finddonor', { 
                 state: {
                     requestId: newRequestRef.key,
                     bloodType: formData.bloodType,
