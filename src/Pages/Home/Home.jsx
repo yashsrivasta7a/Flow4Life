@@ -7,6 +7,8 @@ import { getDatabase, ref, get } from 'firebase/database';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import Navbar from '../../components/Navbar';
+import { FaBell } from 'react-icons/fa';
+
 
 const Home = () => {
   const navigate = useNavigate();
@@ -209,6 +211,7 @@ const Home = () => {
           </div>
         </div>
       </div>
+      
     </>
   );
 };

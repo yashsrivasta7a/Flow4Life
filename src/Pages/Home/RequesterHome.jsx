@@ -1,9 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Search, Clock, FileText, MapPin, Phone, AlertCircle } from 'lucide-react';
+import { Search, Clock, FileText, Phone, AlertCircle } from 'lucide-react';
+import { MdEmail } from 'react-icons/md';
 
 const RequesterHome = () => {
+  
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    message: "",
+  });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    console.log("Message sent:", formData);
+    setFormData({ name: "", email: "", message: "" });
+    alert("Message sent successfully!");
+  };
+
   const requestSteps = [
     {
       icon: <FileText className="w-8 h-8 text-blue-500" />,
@@ -26,7 +46,7 @@ const RequesterHome = () => {
     <div className="min-h-screen w-full bg-gradient-to-b from-blue-50 to-white">
       {/* Hero Section */}
       <section className="w-full px-4 py-20 sm:px-6 lg:px-8">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center w-full"
@@ -120,30 +140,45 @@ const RequesterHome = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <Phone className="w-6 h-6 text-blue-600" />
-                <span className="text-gray-700">Emergency Hotline: 1-800-BLOOD-HELP</span>
+                <span className="text-gray-700">Emergency Hotline: +91-11-23711551</span>
               </div>
               <div className="flex items-center gap-3">
-                <MapPin className="w-6 h-6 text-blue-600" />
-                <span className="text-gray-700">Find Blood Banks Near You</span>
+                <MdEmail className="w-6 h-6 text-blue-600" />
+                <span className="text-gray-700">
+                  Email us at <a href="mailto:flow4life.info@gmail.com" className="text-blue-600 underline">flow4life.info@gmail.com</a>
+                </span>
               </div>
             </div>
           </div>
+
           <div className="bg-blue-50 p-6 rounded-xl shadow-soft w-full">
-            <form className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="text"
+                name="name"
                 placeholder="Your Name"
+                value={formData.name}
+                onChange={handleChange}
                 className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
               />
               <input
                 type="email"
+                name="email"
                 placeholder="Your Email"
+                value={formData.email}
+                onChange={handleChange}
                 className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
               />
               <textarea
+                name="message"
                 placeholder="Your Message"
                 rows="4"
+                value={formData.message}
+                onChange={handleChange}
                 className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
               ></textarea>
               <button
                 type="submit"
@@ -159,4 +194,4 @@ const RequesterHome = () => {
   );
 };
 
-export default RequesterHome; 
+export default RequesterHome;

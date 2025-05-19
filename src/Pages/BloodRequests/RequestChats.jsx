@@ -3,7 +3,7 @@ import { getDatabase, ref, onValue, push, set, get } from 'firebase/database';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
-import { MessageCircle, MapPin, AlertCircle, Clock, ArrowLeft, Send, User, Search } from 'lucide-react';
+import { MessageCircle, MapPin, AlertCircle, Clock, ArrowLeft, Send, User } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 
 const RequestChats = () => {
@@ -19,15 +19,6 @@ const RequestChats = () => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const messagesEndRef = useRef(null);
-
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
 
   useEffect(() => {
     if (!auth.currentUser) {
@@ -241,269 +232,238 @@ const RequestChats = () => {
     return Math.floor(seconds) + ' seconds ago';
   };
 
-  const filteredItems = (items, type) => {
-    const query = searchQuery.toLowerCase();
-    return items.filter(item => {
-      if (type === 'chats') {
-        return (
-          item.displayName.toLowerCase().includes(query) ||
-          item.requestInfo?.bloodType?.toLowerCase().includes(query) ||
-          item.requestInfo?.hospital?.toLowerCase().includes(query)
-        );
-      } else {
-        return (
-          item.patientName?.toLowerCase().includes(query) ||
-          item.bloodType?.toLowerCase().includes(query) ||
-          item.hospital?.toLowerCase().includes(query)
-        );
-      }
-    });
-  };
+  const filteredChats = chats.filter(chat => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      chat.requestInfo?.patientName?.toLowerCase().includes(searchLower) ||
+      chat.requestInfo?.bloodType?.toLowerCase().includes(searchLower) ||
+      chat.requestInfo?.hospital?.toLowerCase().includes(searchLower) ||
+      chat.requestInfo?.city?.toLowerCase().includes(searchLower)
+    );
+  });
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
-      {/* Header */}
-      <motion.div
-        className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-10"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center">
-          <button
-            onClick={() => navigate(-1)}
-            className="mr-4 p-2 rounded-full hover:bg-gray-100"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900">Blood Request Chats</h1>
-        </div>
-      </motion.div>
-
-      <div className="flex h-[calc(100vh-64px)] max-w-7xl mx-auto border border-gray-200 rounded-lg overflow-hidden shadow-lg">
-        {/* Chat List Sidebar */}
-        <div className="w-80 border-r border-gray-200 bg-white flex flex-col">
-          {/* Search Bar */}
-          <div className="p-4 border-b border-gray-200">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search chats and requests..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border-2 border-gray-100 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
-              />
-              <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {loading ? (
-              <div className="flex justify-center items-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-4 border-red-500 border-t-transparent"></div>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-200">
-                {/* Available Blood Requests Section */}
-                {availableRequests.length > 0 && (
-                  <div className="py-3">
-                    <h2 className="px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Available Blood Requests
-                    </h2>
-                    {filteredItems(availableRequests, 'requests').map((request) => (
-                      <motion.button
-                        key={request.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="w-full text-left p-3 hover:bg-gray-50 transition-colors"
-                        onClick={() => handleChatClick(request.userId, request.patientName, request)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                            <User className="w-5 h-5 text-red-600" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-gray-900 truncate">
-                              {request.patientName}
-                            </h3>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-red-600 font-medium">
-                                {request.bloodType}
-                              </span>
-                              {request.urgency === 'emergency' && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                  <AlertCircle className="w-3 h-3" />
-                                  Emergency
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-sm text-gray-500 truncate mt-1">
-                              {request.hospital}, {request.city}
-                            </div>
-                          </div>
-                        </div>
-                      </motion.button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Chat History Section */}
-                {chats.length > 0 && (
-                  <div className="py-3">
-                    <h2 className="px-4 text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Chat History
-                    </h2>
-                    {filteredItems(chats, 'chats').map((chat) => (
-                      <motion.button
-                        key={chat.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`w-full text-left p-3 hover:bg-gray-50 transition-colors ${
-                          selectedChat === chat.id ? 'bg-red-50' : ''
-                        }`}
-                        onClick={() => handleChatSelect(chat.id)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                            <User className="w-5 h-5 text-red-600" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-gray-900 truncate">
-                              {chat.displayName}
-                            </h3>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-red-600 font-medium">
-                                {chat.requestInfo?.bloodType}
-                              </span>
-                              {chat.requestInfo?.urgency === 'emergency' && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                                  <AlertCircle className="w-3 h-3" />
-                                  Emergency
-                                </span>
-                              )}
-                            </div>
-                            {chat.lastMessage && (
-                              <div className="text-sm text-gray-500 truncate mt-1">
-                                {chat.lastMessage}
-                              </div>
-                            )}
-                            {chat.unread && (
-                              <div className="mt-1">
-                                <span className="inline-block w-2 h-2 bg-red-500 rounded-full"></span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </motion.button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Empty State */}
-                {!loading && availableRequests.length === 0 && chats.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-                    <MessageCircle className="w-12 h-12 text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Active Chats</h3>
-                    <p className="text-gray-600">Your chats with blood requesters will appear here</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Chat Area */}
-        {selectedChat ? (
-          <div className="flex-1 flex flex-col bg-gray-50">
-            {/* Chat Header */}
-            <div className="p-4 bg-white border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <User className="w-5 h-5 text-red-600" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium text-gray-900">
-                      {selectedChatData?.otherUserName || 'Unknown User'}
-                    </h3>
-                    {selectedChatData?.requestInfo?.patientName && selectedChatData?.requestInfo?.patientName !== selectedChatData?.otherUserName && (
-                      <span className="text-sm text-gray-500">
-                        (Patient: {selectedChatData.requestInfo.patientName})
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    {selectedChatData?.requestInfo?.bloodType && (
-                      <>
-                        <span className="font-medium text-red-600">
-                          {selectedChatData.requestInfo.bloodType}
-                        </span>
-                        <span>•</span>
-                      </>
-                    )}
-                    <span>{selectedChatData?.requestInfo?.hospital || 'Chat'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.isCurrentUser ? 'justify-end' : 'justify-start'}`}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-r from-red-600 to-red-800 text-white py-8">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => navigate('/blood-requests')}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                 >
-                  <div
-                    className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                      msg.isCurrentUser
-                        ? 'bg-red-600 text-white'
-                        : 'bg-white border border-gray-200'
-                    }`}
-                  >
-                    {!msg.isCurrentUser && (
-                      <p className={`text-xs font-medium mb-1 ${msg.isCurrentUser ? 'text-red-100' : 'text-gray-700'}`}>
-                        {msg.senderName || selectedChatData?.otherUserName || 'Unknown User'}
-                      </p>
+                  <ArrowLeft className="w-6 h-6" />
+                </button>
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-bold mb-2">
+                    Blood Request Chats
+                  </h1>
+                  <p className="text-lg text-red-100">
+                    Communicate with blood requesters
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => navigate("/")}
+                className="bg-white text-red-600 px-5 py-2 rounded-xl hover:bg-red-50 transition-all transform hover:scale-105"
+              >
+                Home
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Search Section */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 transform transition-all hover:shadow-xl">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search by patient name, blood type, hospital, or city..."
+              className="w-full px-5 py-4 pr-12 text-lg border-2 border-gray-100 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Chats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {loading ? (
+            <div className="col-span-full flex flex-col items-center justify-center py-16">
+              <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-gray-600 text-lg">Loading your chats...</p>
+            </div>
+          ) : filteredChats.length > 0 ? (
+            filteredChats.map((chat) => (
+              <motion.div
+                key={chat.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -5 }}
+                className={`bg-white p-6 rounded-2xl shadow-md transition-all cursor-pointer ${
+                  selectedChat === chat.id ? 'ring-2 ring-red-500 ring-offset-2' : ''
+                }`}
+                onClick={() => setSelectedChat(chat.id)}
+              >
+                {/* Request Info */}
+                {chat.requestInfo && (
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-100">
+                        {chat.requestInfo.bloodType}
+                      </span>
+                      {chat.requestInfo.urgency === 'emergency' && (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-medium bg-red-600 text-white">
+                          <AlertCircle className="w-4 h-4" />
+                          Emergency
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-start gap-2 text-sm text-gray-600">
+                      <MapPin className="w-4 h-4 mt-0.5" />
+                      <div>
+                        <div className="font-medium">{chat.requestInfo.hospital}</div>
+                        <div>{chat.requestInfo.city}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Chat Preview */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-red-100 to-red-200 rounded-xl flex items-center justify-center">
+                        <User className="w-5 h-5 text-red-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-800">
+                          {chat.requestInfo?.patientName || chat.otherUserName}
+                        </h3>
+                        <span className="text-xs text-gray-500">
+                          {getTimeAgo(chat.timestamp)}
+                        </span>
+                      </div>
+                    </div>
+                    {chat.unread && (
+                      <span className="inline-block w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
                     )}
-                    <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
-                    <p className={`text-xs mt-1 ${msg.isCurrentUser ? 'text-red-100' : 'text-gray-500'}`}>
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg mt-3">
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {chat.lastMessage}
                     </p>
                   </div>
                 </div>
-              ))}
-              <div ref={messagesEndRef} /> {/* Auto-scroll anchor */}
-            </div>
-
-            {/* Message Input */}
-            <div className="p-4 bg-white border-t border-gray-200">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                  placeholder="Type your message..."
-                  className="flex-1 px-4 py-2 border-2 border-gray-100 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!message.trim()}
-                  className="p-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
+              </motion.div>
+            ))
+          ) : (
+            <div className="col-span-full flex flex-col items-center justify-center py-16 bg-white rounded-2xl shadow-lg">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <MessageCircle className="w-8 h-8 text-gray-400" />
               </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Active Chats</h3>
+              <p className="text-gray-600">
+                Your chats with blood requesters will appear here
+              </p>
             </div>
-          </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-              <MessageCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Chat</h3>
-              <p className="text-gray-600">Choose a chat from the sidebar to start messaging</p>
-            </div>
+          )}
+        </div>
+
+        {/* Chat Modal */}
+        {selectedChat && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-2xl rounded-2xl max-h-[80vh] flex flex-col overflow-hidden"
+            >
+              {/* Chat Header */}
+              <div className="p-4 border-b flex items-center justify-between bg-gradient-to-r from-red-600 to-red-800 text-white">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSelectedChat(null)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  <div>
+                    <h3 className="font-semibold text-lg">
+                      {chats.find(c => c.id === selectedChat)?.requestInfo?.patientName || 
+                       chats.find(c => c.id === selectedChat)?.otherUserName}
+                    </h3>
+                    <div className="flex items-center gap-2 text-red-100">
+                      <span>{chats.find(c => c.id === selectedChat)?.requestInfo?.bloodType} Blood Request</span>
+                      {chats.find(c => c.id === selectedChat)?.requestInfo?.urgency === 'emergency' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 text-xs">
+                          <AlertCircle className="w-3 h-3" />
+                          Emergency
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${
+                      msg.isCurrentUser ? 'justify-end' : 'justify-start'
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                        msg.isCurrentUser
+                          ? 'bg-red-600 text-white'
+                          : 'bg-white text-gray-900 shadow-sm'
+                      }`}
+                    >
+                      <p>{msg.text}</p>
+                      <p className={`text-xs mt-1 ${
+                        msg.isCurrentUser ? 'text-red-100' : 'text-gray-500'
+                      }`}>
+                        {new Date(msg.timestamp).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Message Input */}
+              <div className="p-4 bg-white border-t">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    placeholder="Type your message..."
+                    className="flex-1 px-4 py-2 border-2 border-gray-100 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-all"
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    className="p-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           </div>
         )}
       </div>

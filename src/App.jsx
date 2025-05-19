@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { getAuth } from 'firebase/auth';
 import Signuppage from './Pages/signup/Signuppage';
 import Signinpage from './Pages/signin/Signinpage';
 import Home from './Pages/Home/Home';
@@ -21,9 +22,13 @@ import RequestChats from './Pages/BloodRequests/RequestChats';
 import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import Chatbot from './components/Chatbot';
+import io from 'socket.io-client';
+import { requestNotificationPermission, showNotification } from './Utils/NotificationSystem';
+import NotificationsPage from "../src/Pages/Notifications/NotificationsPage"
 
 function AppContent() {
   const location = useLocation();
+  
 
   // Add any routes you want to exclude the chatbot from
   const hideChatbotRoutes = ['/signin', '/signup'];
@@ -43,6 +48,7 @@ function AppContent() {
               <Route path="/signup" element={<Signuppage />} />
               <Route path="/learn-more" element={<LearnMore />} />
               <Route path="/chatbot" element={<Chatbot />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
 
               {/* Protected Routes */}
               <Route
@@ -162,20 +168,52 @@ function AppContent() {
 
 // App wrapper for Router
 function App() {
+ 
+
   if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/firebase-messaging-sw.js')
+      .register('/service-worker.js') // ✅ this must match the file in /public
       .then((registration) => {
-        console.log('Service Worker registered with scope:', registration.scope);
+        console.log('✅ Service Worker registered:', registration);
       })
       .catch((err) => {
-        console.error('Service Worker registration failed:', err);
+        console.error('❌ Service Worker registration failed:', err);
       });
-  }
+  });
+}
+const socket = io('http://localhost:4000'); 
+ useEffect(() => {
+    // Request notification permission on component mount
+    requestNotificationPermission();
+
+    // Listen for 'notification' events from the server
+    socket.on('notification', (data) => {
+      const { title, body, url, receiverId } = data;
+      // Only show notification if the current user is the receiver
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (user && receiverId === user.uid) {
+        showNotification(title, {
+          body,
+          icon: '/notification-icon.png',
+          data: { url },
+        });
+      }
+    });
+
+    // Cleanup on unmount
+    return () => {
+      socket.off('notification');
+    };
+  }, []);
+
+
 
   return (
     <Router>
       <AppContent />
+        <h1>Socket.IO Notification Demo</h1>
     </Router>
   );
 }

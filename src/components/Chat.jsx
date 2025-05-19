@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { getAuth } from 'firebase/auth';
-import { getDatabase, ref, onValue, push, set, get ,update} from 'firebase/database';
+import { getDatabase, ref, onValue, push, set, get, update } from 'firebase/database';
 import { useNavigate } from 'react-router-dom';
 import { motion } from "framer-motion";
 import { ChevronLeft, Send, User, MessageCircle } from "lucide-react";
 import { app } from '../Utils/Firebase';
 import { toast } from "react-hot-toast";
-import { sendChatNotification } from '../Utils/Notifications'; // Your notification helper
+import { sendChatNotification } from '../Utils/Notifications';
+import socket from "../Utils/socket";
+import { requestNotificationPermission, showNotification } from '../Utils/NotificationSystem';
 
 const Chat = () => {
   const navigate = useNavigate();
@@ -23,6 +25,7 @@ const Chat = () => {
   const [donors, setDonors] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -34,6 +37,101 @@ const Chat = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  // Check and request notification permissions on component mount
+  useEffect(() => {
+    const setupNotifications = async () => {
+      const hasPermission = await requestNotificationPermission();
+      setNotificationsEnabled(hasPermission);
+      
+      if (!hasPermission) {
+        toast.info("Enable notifications for a better chat experience", {
+          duration: 5000,
+          icon: '🔔',
+        });
+      }
+    };
+    
+    setupNotifications();
+  }, []);
+
+  // --- SOCKET.IO NOTIFICATION SYSTEM ---
+  useEffect(() => {
+    if (!user) return;
+    // Join user's room for private messages
+    socket.emit("join", user.uid);
+
+    // Listen for incoming messages (real-time chat updates)
+    socket.on("receive-message", (data) => {
+      // If the message is for the current user and not in the active chat, show notification
+      if (
+        data.receiverId === user.uid &&
+        (!selectedChat || selectedChat.otherUserId !== data.senderId)
+      ) {
+        // Toast notification (in-app)
+        toast.success(`New message from ${data.senderName || "User"}`);
+        
+        // Browser notification
+        if (notificationsEnabled) {
+          showNotification(
+            `Message from ${data.senderName || "User"}`,
+            data.text,
+            () => {
+              // Find the chat with this sender and open it when clicked
+              const chatWithSender = chats.find(chat => chat.otherUserId === data.senderId);
+              if (chatWithSender) {
+                selectChat(chatWithSender);
+              }
+            }
+          );
+        }
+        
+        // Update unread status in chats list
+        setChats((prevChats) =>
+          prevChats.map((chat) =>
+            chat.otherUserId === data.senderId
+              ? { ...chat, unread: true }
+              : chat
+          )
+        );
+      }
+      
+      // If the message is for the current chat, append it
+      if (
+        selectedChat &&
+        ((data.senderId === selectedChat.otherUserId && data.receiverId === user.uid) ||
+         (data.senderId === user.uid && data.receiverId === selectedChat.otherUserId))
+      ) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: data.id || Date.now(),
+            text: data.text,
+            sender: data.senderId,
+            senderName: data.senderName,
+            timestamp: data.timestamp,
+          },
+        ]);
+      }
+    });
+
+    // Listen for chat notifications
+    socket.on("notification", (data) => {
+      const { title, body, url, receiverId } = data;
+      if (user && receiverId === user.uid) {
+        showNotification(title, {
+          body,
+          icon: '/notification-icon.png',
+          data: { url },
+        });
+      }
+    });
+
+    return () => {
+      socket.off("receive-message");
+      socket.off("notification");
+    };
+  }, [user, selectedChat, chats, notificationsEnabled]);
 
   // Typing indicator handler
   const handleTyping = () => {
@@ -193,11 +291,21 @@ const Chat = () => {
         timestamp: Date.now()
       });
 
+      // Send notification to the donor
       await sendChatNotification(
         donorId,
         "A new chat has been started with you",
         auth.currentUser.displayName || auth.currentUser.email.split('@')[0]
       );
+
+      // Also send via socket for real-time notification
+      socket.emit("send-message", {
+        text: "Chat started",
+        senderId: auth.currentUser.uid,
+        receiverId: donorId,
+        senderName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
+        timestamp: Date.now()
+      });
 
       const newChat = {
         id: chatId,
@@ -246,20 +354,27 @@ const Chat = () => {
     });
   };
 
-  // Send a message
+  // Send message with Socket.IO
   const sendMessage = (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedChat) return;
 
     const messageData = {
       text: newMessage,
-      sender: auth.currentUser.uid,
+      senderId: auth.currentUser.uid,
+      receiverId: selectedChat.otherUserId,
       senderName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
       timestamp: Date.now()
     };
 
+    // Save to Firebase
     const newMessageRef = push(ref(database, `messages/${selectedChat.id}`));
-    set(newMessageRef, messageData);
+    set(newMessageRef, {
+      text: newMessage,
+      sender: messageData.senderId,
+      senderName: messageData.senderName,
+      timestamp: messageData.timestamp
+    });
 
     const otherUserId = selectedChat.otherUserId;
     if (!otherUserId) {
@@ -269,20 +384,37 @@ const Chat = () => {
     }
 
     const updates = {};
-updates[`userChats/${auth.currentUser.uid}/${selectedChat.id}/lastMessage`] = newMessage;
-updates[`userChats/${auth.currentUser.uid}/${selectedChat.id}/timestamp`] = messageData.timestamp;
-updates[`userChats/${otherUserId}/${selectedChat.id}/lastMessage`] = newMessage;
-updates[`userChats/${otherUserId}/${selectedChat.id}/timestamp`] = messageData.timestamp;
-updates[`userChats/${otherUserId}/${selectedChat.id}/unread`] = true;
+    updates[`userChats/${auth.currentUser.uid}/${selectedChat.id}/lastMessage`] = newMessage;
+    updates[`userChats/${auth.currentUser.uid}/${selectedChat.id}/timestamp`] = messageData.timestamp;
+    updates[`userChats/${otherUserId}/${selectedChat.id}/lastMessage`] = newMessage;
+    updates[`userChats/${otherUserId}/${selectedChat.id}/timestamp`] = messageData.timestamp;
+    updates[`userChats/${otherUserId}/${selectedChat.id}/unread`] = true;
 
-update(ref(database), updates);
+    update(ref(database), updates);
+
+    // Send notification through Firebase for offline users
     sendChatNotification(
       otherUserId,
       newMessage,
-      auth.currentUser.displayName || auth.currentUser.email.split('@')[0]
+      messageData.senderName
     );
 
+    // Emit message via socket.io for real-time updates
+    socket.emit("send-message", messageData);
+
     setNewMessage('');
+  };
+
+  // Function to request notification permission again if needed
+  const requestNotifications = async () => {
+    const hasPermission = await requestNotificationPermission();
+    setNotificationsEnabled(hasPermission);
+    
+    if (hasPermission) {
+      toast.success("Notifications enabled successfully");
+    } else {
+      toast.error("Failed to enable notifications. Please check your browser settings.");
+    }
   };
 
   return (
@@ -294,14 +426,26 @@ update(ref(database), updates);
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center">
-          <button
-            onClick={() => navigate(-1)}
-            className="mr-4 p-2 rounded-full hover:bg-gray-100"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900">Chat</h1>
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <button
+              onClick={() => navigate(-1)}
+              className="mr-4 p-2 rounded-full hover:bg-gray-100"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-2xl font-bold text-gray-900">Chat</h1>
+          </div>
+          
+          {/* Notification toggle button */}
+          {!notificationsEnabled && (
+            <button 
+              onClick={requestNotifications}
+              className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+            >
+              Enable Notifications
+            </button>
+          )}
         </div>
       </motion.div>
 
@@ -385,14 +529,16 @@ update(ref(database), updates);
                   messages.map(msg => (
                     <div
                       key={`message-${msg.id}`}
-                      className={`max-w-xs rounded-lg p-3 ${
+                      className={`${
                         msg.sender === auth.currentUser.uid
-                          ? "bg-blue-600 text-white self-end"
-                          : "bg-white border border-gray-300"
-                      }`}
+                          ? "ml-auto bg-blue-600 text-white"
+                          : "mr-auto bg-white border border-gray-300"
+                      } max-w-xs rounded-lg p-3`}
                     >
                       <p className="text-sm">{msg.text}</p>
-                      <p className="text-xs text-gray-300 mt-1 text-right">
+                      <p className={`text-xs mt-1 text-right ${
+                        msg.sender === auth.currentUser.uid ? "text-gray-300" : "text-gray-500"
+                      }`}>
                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
