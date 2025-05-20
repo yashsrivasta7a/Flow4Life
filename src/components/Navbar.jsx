@@ -18,7 +18,7 @@ const Navbar = ({ user, onLogout, notifications, showNotifications, setShowNotif
 
   const navLinks = [
     { name: 'Home', path: '/' },
-    { name: 'Find Donor', path: '/finddonor' },
+
     { name: 'Chats', path: '/chats' },
     // { name: 'Notifications', path: '/notifications' },
     { name: 'Profile', path: `/profile/${user?.uid}` },

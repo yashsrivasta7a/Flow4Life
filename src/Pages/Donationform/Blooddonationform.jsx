@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Check, X, AlertCircle, Info, Calendar, Clock, Heart } from 'lucide-react';
 
-const SuccessModal = ({ isOpen, onClose }) => {
+const SuccessModal = ({ isOpen, onClose, isLoading }) => {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -22,31 +22,48 @@ const SuccessModal = ({ isOpen, onClose }) => {
             exit={{ scale: 0.5, opacity: 0 }}
             className="bg-white rounded-xl p-8 max-w-md w-full mx-4 relative"
           >
-            <div className="absolute top-4 right-4">
-              <button
-                onClick={onClose}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-6">
-                <Heart className="h-8 w-8 text-red-600" />
+            {!isLoading && (
+              <div className="absolute top-4 right-4">
+                <button
+                  onClick={onClose}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </button>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                Registration Successful!
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Thank you for registering as a blood donor. Your commitment to helping others is truly appreciated.
-                Together, we can save lives!
-              </p>
-              <button
-                onClick={onClose}
-                className="bg-red-600 text-white px-6 py-3 rounded-full font-semibold hover:bg-red-700 transition-colors"
-              >
-                Continue
-              </button>
+            )}
+            <div className="text-center">
+              {isLoading ? (
+                <>
+                  <div className="mx-auto flex items-center justify-center h-16 w-16 mb-6">
+                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-red-500 border-t-transparent"></div>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                    Processing Your Registration
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    Please wait while we register you as a donor
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-6">
+                    <Heart className="h-8 w-8 text-red-600" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                    Registration Successful!
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    Thank you for registering as a blood donor. Your commitment to helping others is truly appreciated.
+                  </p>
+                  <button
+                    onClick={onClose}
+                    className="bg-red-600 text-white px-6 py-3 rounded-full font-semibold hover:bg-red-700 transition-colors"
+                  >
+                    Go to Dashboard
+                  </button>
+                </>
+              )}
             </div>
           </motion.div>
         </motion.div>
@@ -61,6 +78,7 @@ const BloodDonationForm = () => {
   const database = getDatabase();
   const [loading, setLoading] = useState(true);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [lastDonationDate, setLastDonationDate] = useState(null);
 
   // Check if user is already registered as donor and validate 7-day cooling period
@@ -80,14 +98,18 @@ const BloodDonationForm = () => {
           get(ref(database, `donation_requests/${user.uid}`))
         ]);
 
-        let existingData = {};
+        let existingData = {
+          // Always set these from auth data first
+          name: user.displayName || '',
+          email: user.email || '',
+        };
         
         if (userSnapshot.exists()) {
           const userData = userSnapshot.val();
           existingData = {
             ...existingData,
-            name: userData.name || '',
-            email: user.email,
+            // Only override name if it exists in userData and not in auth
+            name: existingData.name || userData.name || '',
             phone: userData.phone || '',
             city: userData.city || ''
           };
@@ -105,8 +127,6 @@ const BloodDonationForm = () => {
             age: donorData.age || '',
             weight: donorData.weight || ''
           };
-
-          // Removed 7-day cooling period check
         }
 
         // Pre-fill form with existing data
@@ -289,9 +309,6 @@ const BloodDonationForm = () => {
       return;
     }
 
-    // Check for 7-day cooling period if this is a repeat donation
-    // Removed 7-day cooling period check
-
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -305,6 +322,7 @@ const BloodDonationForm = () => {
         ...formData,
         userId: user.uid,
         email: user.email,
+        name: formData.name || user.displayName || user.email.split('@')[0], // Fallback to username from email
         timestamp: Date.now(),
         type: 'donor',
         status: 'active',
@@ -314,10 +332,11 @@ const BloodDonationForm = () => {
       // Create donation request data with current timestamp as lastDonation
       const donationRequestData = {
         userId: user.uid,
-        name: formData.name,
+        name: userData.name, // Use the same name as in userData
+        email: user.email,
         bloodType: formData.bloodType,
         city: formData.city,
-        lastDonation: Date.now(), // Set the current timestamp as last donation date
+        lastDonation: Date.now(),
         status: 'available',
         timestamp: Date.now(),
       };
@@ -328,24 +347,27 @@ const BloodDonationForm = () => {
         set(ref(database, `donation_requests/${user.uid}`), donationRequestData)
       ]);
 
-      // Show success message
-      toast.success(
-        "Thank you for registering as a donor! You're making a difference.", 
-        {
-          duration: 3000,
-          position: 'top-center',
-          style: {
-            background: '#10B981',
-            color: '#FFFFFF',
-            padding: '16px',
-            borderRadius: '8px',
-          },
-          icon: '❤️'
-        }
-      );
-
-      // Show success modal
+      // Show loading modal first
+      setIsProcessing(true);
       setShowSuccessModal(true);
+
+      // Simulate processing time (you can replace this with actual matching logic)
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Show success state
+      setIsProcessing(false);
+      
+      toast.success("Registration complete! Thank you for becoming a blood donor.", {
+        duration: 5000,
+        position: 'top-center',
+        style: {
+          background: '#10B981',
+          color: '#FFFFFF',
+          padding: '16px',
+          borderRadius: '8px',
+        },
+        icon: '❤️'
+      });
 
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -364,7 +386,7 @@ const BloodDonationForm = () => {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-red-50 to-white py-12 px-4 sm:px-6 lg:px-8">
-      <SuccessModal isOpen={showSuccessModal} onClose={handleModalClose} />
+      <SuccessModal isOpen={showSuccessModal} onClose={handleModalClose} isLoading={isProcessing} />
       {loading ? (
         <div className="flex justify-center items-center h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-red-500 border-t-transparent"></div>
@@ -499,11 +521,19 @@ const BloodDonationForm = () => {
                       type="tel"
                       name="phone"
                       required
-                      className={`input ${formData.phone ? 'bg-gray-50' : ''}`}
+                      placeholder="e.g., 1234567890"
+                      maxLength="10"
+                      className="input"
                       value={formData.phone}
-                      onChange={handleInputChange}
-                      disabled={!!formData.phone}
-                    />
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        setFormData(prev => ({
+                          ...prev,
+                          phone: value
+                        }));
+                      }}
+                      />
+                    <p className="mt-1 text-sm text-gray-500">Enter 10-digit number without spaces or special characters</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">City</label>

@@ -1,19 +1,89 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { getAuth } from 'firebase/auth';
 import { getDatabase, ref, set, push } from 'firebase/database';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { AlertCircle, Clock, MapPin, User, Phone, MessageSquare } from 'lucide-react';
+import { AlertCircle, Clock, MapPin, User, Phone, MessageSquare, X, Search } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import { sendCityNotification } from '../../components/SendCityNotification';
 import { checkAndSendMatchingRequests } from '../../Utils/EmailNotifications';
+
+const SuccessModal = ({ isOpen, onClose, isLoading }) => {
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+                >
+                    <motion.div
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.5, opacity: 0 }}
+                        className="bg-white rounded-xl p-8 max-w-md w-full mx-4 relative"
+                    >
+                        {!isLoading && (
+                            <div className="absolute top-4 right-4">
+                                <button
+                                    onClick={onClose}
+                                    className="text-gray-500 hover:text-gray-700"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                        )}
+                        <div className="text-center">
+                            {isLoading ? (
+                                <>
+                                    <div className="mx-auto flex items-center justify-center h-16 w-16 mb-6">
+                                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent"></div>
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                                        Processing Your Request
+                                    </h3>
+                                    <p className="text-gray-600 mb-6">
+                                        Please wait while we find potential donors in your area.
+                                        This may take a few moments.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 mb-6">
+                                        <Search className="h-8 w-8 text-blue-600" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                                        Request Submitted Successfully!
+                                    </h3>
+                                    <p className="text-gray-600 mb-6">
+                                        Your blood request has been received. Nearby donors will be notified,
+                                        and you will receive an email when a match is found.
+                                    </p>
+                                    <button
+                                        onClick={onClose}
+                                        className="bg-blue-600 text-white px-6 py-3 rounded-full font-semibold hover:bg-blue-700 transition-colors"
+                                    >
+                                        Go to Home
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
+};
 
 const RequestForm = ({ emergency = false }) => {
     const navigate = useNavigate();
     const auth = getAuth();
     const database = getDatabase();
     const [loading, setLoading] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [user, setUser] = useState(null);
     const [notifications, setNotifications] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
@@ -73,6 +143,11 @@ const RequestForm = ({ emergency = false }) => {
         }));
     };
 
+    const handleModalClose = () => {
+        setShowSuccessModal(false);
+        navigate('/');
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -83,6 +158,10 @@ const RequestForm = ({ emergency = false }) => {
                 navigate('/signin', { state: { from: '/request-form' } });
                 return;
             }
+
+            // Show loading modal first
+            setIsProcessing(true);
+            setShowSuccessModal(true);
 
             const requestData = {
                 ...formData,
@@ -98,7 +177,7 @@ const RequestForm = ({ emergency = false }) => {
             const newRequestRef = push(ref(database, 'blood_requests'));
             await set(newRequestRef, requestData);
 
-            // Send notifications to matching donors
+            // Find and notify matching donors
             await checkAndSendMatchingRequests(requestData);
             
             // Send city-based notifications if it's an emergency
@@ -106,23 +185,29 @@ const RequestForm = ({ emergency = false }) => {
                 await sendCityNotification(formData.city, formData.bloodType);
             }
 
-            toast.success("Blood request submitted successfully!");
-            
-            // Navigate to FindDonor with full request details
-            navigate('/finddonor', { 
-                state: {
-                    requestId: newRequestRef.key,
-                    bloodType: formData.bloodType,
-                    city: formData.city,
-                    location: userLocation,
-                    emergency: emergency,
-                    timestamp: Date.now()
-                }
+            // Show success state after processing
+            setIsProcessing(false);
+
+            toast.success(emergency 
+                ? "Emergency blood request submitted! Finding donors in your area."
+                : "Blood request submitted successfully! You'll be notified when we find a match.", 
+            {
+                duration: 5000,
+                position: 'top-center',
+                style: {
+                    background: '#2563EB',
+                    color: '#FFFFFF',
+                    padding: '16px',
+                    borderRadius: '8px',
+                },
+                icon: '🩸'
             });
 
         } catch (error) {
             console.error('Error submitting request:', error);
             toast.error("Error submitting request. Please try again.");
+            setShowSuccessModal(false);
+            setIsProcessing(false);
         }
     };
 
@@ -382,6 +467,11 @@ const RequestForm = ({ emergency = false }) => {
                     </motion.div>
                 </div>
             </div>
+            <SuccessModal
+                isOpen={showSuccessModal}
+                onClose={handleModalClose}
+                isLoading={isProcessing}
+            />
         </>
     );
 };
