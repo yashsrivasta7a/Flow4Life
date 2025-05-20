@@ -202,11 +202,10 @@ const BloodRequests = () => {
       toast.error("Failed to connect with requester. Please try again.");
     }
   };
-
   const getUrgencyColor = (urgency) => {
     switch (urgency) {
       case 'emergency':
-        return 'bg-red-600 text-white';
+        return 'bg-gradient-to-r from-red-600 to-red-700 text-white font-bold';
       case 'urgent':
         return 'bg-orange-500 text-white';
       default:
@@ -322,29 +321,48 @@ const BloodRequests = () => {
               <p className="text-gray-600 text-lg">Finding blood requests...</p>
             </div>
           ) : filteredRequests.length > 0 ? (
-            filteredRequests.map((request) => (
-              <motion.div
+            filteredRequests.map((request) => (              <motion.div
                 key={request.id}
                 initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                animate={{ 
+                  opacity: 1, 
+                  y: 0,
+                  scale: request.urgency === 'emergency' ? [1, 1.02, 1] : 1,
+                  transition: {
+                    scale: {
+                      repeat: Infinity,
+                      duration: 2
+                    }
+                  }
+                }}
                 whileHover={{ y: -5 }}
-                className={`bg-white p-6 rounded-2xl shadow-md transition-all ${
-                  request.urgency === 'emergency' ? 'ring-2 ring-red-500 ring-offset-2' : ''
+                className={`p-6 rounded-2xl shadow-md transition-all ${
+                  request.urgency === 'emergency' 
+                    ? 'bg-red-50 ring-2 ring-red-500 ring-offset-2 animate-pulse-subtle' 
+                    : 'bg-white'
                 }`}
               >
                 {/* Header with Patient Name and Chat Button */}
                 <div className="flex justify-between items-start mb-6">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                  <div className="flex-1">                    <h3 className={`text-xl font-semibold mb-2 ${
+                      request.urgency === 'emergency' ? 'text-red-700' : 'text-gray-800'
+                    }`}>
                       {request.patientName}
                     </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {/* Blood Type Badge */}
-                      <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-100">
+                    <div className="flex flex-wrap gap-2">                  {/* Blood Type Badge */}
+                      <span className={`inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium ${
+                        request.urgency === 'emergency' 
+                          ? 'bg-red-100 text-red-700 border-2 border-red-300 font-bold'
+                          : 'bg-red-50 text-red-700 border border-red-100'
+                      }`}>
                         {request.bloodType}
-                      </span>
-                      {/* Urgency Badge */}
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-medium ${getUrgencyColor(request.urgency)}`}>
+                      </span>{/* Urgency Badge */}
+                      <span 
+                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-medium 
+                          ${getUrgencyColor(request.urgency)}
+                          ${request.urgency === 'emergency' ? 'animate-pulse shadow-lg shadow-red-200' : ''}
+                        `}
+                      >
                         {getUrgencyIcon(request.urgency)}
                         {request.urgency.charAt(0).toUpperCase() + request.urgency.slice(1)}
                       </span>
@@ -362,13 +380,28 @@ const BloodRequests = () => {
                 </div>
 
                 {/* Request Details */}
-                <div className="space-y-3 text-sm">
-                  {/* Hospital and Location */}
-                  <div className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
-                    <MapPin className="w-5 h-5 text-gray-500 mt-0.5" />
+                <div className="space-y-3 text-sm">                  {/* Hospital and Location */}
+                  <div className={`flex items-start gap-3 p-3 rounded-lg ${
+                    request.urgency === 'emergency' 
+                      ? 'bg-red-50/80 shadow-sm' 
+                      : 'bg-gray-50'
+                  }`}>
+                    <MapPin className={`w-5 h-5 mt-0.5 ${
+                      request.urgency === 'emergency'
+                        ? 'text-red-500'
+                        : 'text-gray-500'
+                    }`} />
                     <div>
-                      <div className="font-medium text-gray-800">{request.hospital}</div>
-                      <div className="text-gray-600">{request.city}</div>
+                      <div className={`font-medium ${
+                        request.urgency === 'emergency'
+                          ? 'text-red-700'
+                          : 'text-gray-800'
+                      }`}>{request.hospital}</div>
+                      <div className={
+                        request.urgency === 'emergency'
+                          ? 'text-red-600/80'
+                          : 'text-gray-600'
+                      }>{request.city}</div>
                       {/* {request.distance && (
                         <div className="text-gray-500 mt-1 flex items-center gap-1">
                           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -378,24 +411,46 @@ const BloodRequests = () => {
                         </div>
                       )} */}
                     </div>
-                  </div>
-
-                  {/* Time and Units */}
+                  </div>                  {/* Time and Units */}
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <div className="flex items-center gap-2 text-gray-600 mb-1">
+                    <div className={`p-3 rounded-lg ${
+                      request.urgency === 'emergency' 
+                        ? 'bg-red-50/80 shadow-sm' 
+                        : 'bg-gray-50'
+                    }`}>
+                      <div className={`flex items-center gap-2 mb-1 ${
+                        request.urgency === 'emergency'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
                         <Clock className="w-4 h-4" />
                         <span className="font-medium">Posted</span>
                       </div>
-                      <div className="text-gray-800">
+                      <div className={
+                        request.urgency === 'emergency'
+                          ? 'text-red-700 font-medium'
+                          : 'text-gray-800'
+                      }>
                         {getTimeAgo(request.timestamp)}
                       </div>
                     </div>
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <div className="text-gray-600 mb-1 font-medium">
+                    <div className={`p-3 rounded-lg ${
+                      request.urgency === 'emergency'
+                        ? 'bg-red-50/80 shadow-sm animate-pulse'
+                        : 'bg-gray-50'
+                    }`}>
+                      <div className={`mb-1 font-medium ${
+                        request.urgency === 'emergency'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
                         Units Needed
                       </div>
-                      <div className="text-2xl font-bold text-red-600">
+                      <div className={`text-2xl font-bold ${
+                        request.urgency === 'emergency'
+                          ? 'text-red-700'
+                          : 'text-red-600'
+                      }`}>
                         {request.units}
                       </div>
                     </div>
@@ -411,9 +466,12 @@ const BloodRequests = () => {
 
                   {/* Donor Action Button */}
                   {auth.currentUser && request.userId !== auth.currentUser.uid && (
-                    <button
-                      onClick={() => handleChatClick(request.userId, request.patientName, request)}
-                      className="w-full mt-4 bg-red-600 text-white px-4 py-3 rounded-xl hover:bg-red-700 transition-all flex items-center justify-center gap-2 group"
+                    <button                      onClick={() => handleChatClick(request.userId, request.patientName, request)}
+                      className={`w-full mt-4 px-4 py-3 rounded-xl transition-all flex items-center justify-center gap-2 group ${
+                        request.urgency === 'emergency'
+                          ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-lg shadow-red-200 hover:shadow-red-300'
+                          : 'bg-red-600 hover:bg-red-700 text-white'
+                      }`}
                     >
                       <MessageCircle className="w-5 h-5 transform group-hover:scale-110 transition-transform" />
                       <span>Respond to Request</span>

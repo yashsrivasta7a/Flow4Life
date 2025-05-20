@@ -27,3 +27,40 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #ff0808; 
   }
+
+@keyframes subtle-pulse {
+  0%, 100% {
+    background-color: rgb(254 242 242); /* red-50 */
+  }
+  50% {
+    background-color: rgb(254 226 226); /* red-100 */
+  }
+}
+
+.animate-pulse-subtle {
+  animation: subtle-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Emergency request specific styles */
+.emergency-request {
+  position: relative;
+}
+
+.emergency-request::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, #ef4444, #dc2626, #ef4444);
+  border-radius: 1rem;
+  z-index: -1;
+  animation: border-pulse 2s linear infinite;
+}
+
+@keyframes border-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

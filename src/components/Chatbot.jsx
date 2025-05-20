@@ -37,7 +37,7 @@ const Chatbot = () => {
       const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
   
       // Add system prompt to guide chatbot's role
-      const systemPrompt = "You are a helpful medical assistant chatbot specialized in blood donation. You help users with blood donation eligibility, requests, information, and related topics.";
+      const systemPrompt = "You are a helpful medical assistant chatbot specialized in blood donation. You help users with blood donation eligibility, requests, information, and related topics. Dont give anything out of blood donation and request or related topic . remove all bold things and *";
       const fullInput = systemPrompt + "\nUser: " + input;
   
       const result = await model.generateContent(fullInput);
