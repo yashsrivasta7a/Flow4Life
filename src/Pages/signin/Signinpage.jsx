@@ -78,7 +78,7 @@ const Signinpage = () => {
 
   return (
     <>
-      <Navbar
+      {/* <Navbar
         user={user}
         onLogout={() => {}}
         notifications={notifications}
@@ -86,7 +86,7 @@ const Signinpage = () => {
         setShowNotifications={setShowNotifications}
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
-      />
+      /> */}
       <div className='page-container'>
         <div className="form-container">
           <div className="header">
