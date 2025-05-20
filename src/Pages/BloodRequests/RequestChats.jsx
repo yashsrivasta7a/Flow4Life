@@ -371,7 +371,8 @@ const RequestChats = () => {
     };
   }, []);
 
-  // Send message  const sendMessage = async (e) => {
+  // Send message
+  const sendMessage = async (e) => {
     e?.preventDefault();
     if (!newMessage.trim() || !selectedChat || !auth.currentUser) return;
 
