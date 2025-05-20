@@ -67,30 +67,30 @@ const Chatbot = () => {
     <>
       {!isOpen && (
         <button
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center"
+          className="fixed bottom-3 right-3 z-50 w-11 h-11 sm:bottom-6 sm:right-6 sm:w-14 sm:h-14 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center"
           onClick={() => setIsOpen(true)}
         >
-          <TbMessageChatbot size={25} />
+          <TbMessageChatbot size={20} className="sm:size-[25px]" />
         </button>
       )}
 
       {isOpen && (
         <div
-          className={`fixed bottom-6 right-6 z-50 w-full sm:w-[400px] max-h-[80vh] bg-white shadow-2xl border border-gray-300 rounded-md flex flex-col transition-transform duration-300`}
+          className="fixed bottom-0 left-0 right-0 mx-auto z-50 w-full max-w-full sm:bottom-6 sm:right-6 sm:left-auto sm:w-[400px] max-h-[95vh] sm:max-h-[80vh] bg-white shadow-2xl border border-gray-300 rounded-t-xl sm:rounded-md flex flex-col transition-transform duration-300"
         >
-          <div className="bg-red-500 text-white px-4 py-3 font-bold flex justify-between items-center rounded-t-md">
-            <span>Flow4Life Chatbot</span>
+          <div className="bg-red-500 text-white px-3 py-2 font-bold flex justify-between items-center rounded-t-xl sm:rounded-t-md text-base sm:text-lg">
+            <span className="truncate">Flow4Life Chatbot</span>
             <button onClick={() => setIsOpen(false)} className="text-white text-xl font-bold">×</button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-2 bg-gray-50">
             {messages.map((msg, index) => (
               <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${
+                  className={`max-w-[85vw] sm:max-w-xs px-3 py-2 rounded-2xl text-sm sm:text-base shadow ${
                     msg.sender === 'user'
                       ? 'bg-red-500 text-white rounded-br-none'
-                      : 'bg-gray-200 text-gray-800 rounded-bl-none'
+                      : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
                   }`}
                 >
                   {msg.text}
@@ -100,7 +100,7 @@ const Chatbot = () => {
 
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-gray-200 text-gray-800 rounded-2xl px-4 py-2 text-sm">
+                <div className="bg-white border border-gray-200 text-gray-800 rounded-2xl px-3 py-2 text-sm shadow">
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                     <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
@@ -113,7 +113,7 @@ const Chatbot = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="border-t px-4 py-3 flex items-center gap-2 rounded-b-md">
+          <div className="border-t px-2 py-2 sm:px-4 sm:py-3 flex items-center gap-2 rounded-b-xl sm:rounded-b-md bg-white">
             <input
               type="text"
               value={input}
@@ -121,14 +121,14 @@ const Chatbot = () => {
               onKeyDown={handleKeyDown}
               placeholder="Type your message..."
               disabled={isLoading}
-              className="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring focus:ring-red-300"
+              className="flex-1 border border-gray-300 rounded-full px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-red-300 bg-gray-50"
             />
             <button
               onClick={handleSend}
               disabled={isLoading}
-              className={`text-white px-4 py-2 rounded-full transition ${
+              className={`text-white px-3 py-2 rounded-full transition ${
                 isLoading ? 'bg-red-300' : 'bg-red-500 hover:bg-red-600'
-              }`}
+              } text-sm`}
             >
               {isLoading ? '...' : 'Send'}
             </button>
