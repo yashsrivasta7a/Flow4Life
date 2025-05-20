@@ -369,14 +369,14 @@ const BloodRequests = () => {
                     <div>
                       <div className="font-medium text-gray-800">{request.hospital}</div>
                       <div className="text-gray-600">{request.city}</div>
-                      {request.distance && (
+                      {/* {request.distance && (
                         <div className="text-gray-500 mt-1 flex items-center gap-1">
                           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                           </svg>
                           {request.distance.toFixed(1)} km away
                         </div>
-                      )}
+                      )} */}
                     </div>
                   </div>
 
