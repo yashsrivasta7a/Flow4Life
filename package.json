@@ -15,6 +15,7 @@
   "dependencies": {
     "@azure/communication-email": "^1.0.0",
     "@google/generative-ai": "^0.24.1",
+    "@headlessui/react": "^2.2.3",
     "@maptiler/client": "^2.2.0",
     "@maptiler/sdk": "^3.0.1",
     "@radix-ui/react-form": "^0.1.2",

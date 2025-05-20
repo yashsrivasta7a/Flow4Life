@@ -187,12 +187,45 @@ const RequestChats = () => {
     });
   };
 
+  // Add new safety guidelines function
+  const showSafetyGuidelines = useCallback(() => {
+    toast((t) => (
+      <div className="flex flex-col gap-2 max-w-md">
+        <h3 className="font-bold text-lg mb-1">Safety Guidelines</h3>
+        <ul className="list-disc pl-4 text-sm space-y-1">
+          <li>Verify identity before sharing personal information</li>
+          <li>Meet in public places for blood donation</li>
+          <li>Share hospital/clinic details through chat</li>
+          <li>Report suspicious behavior immediately</li>
+          <li>Keep communication respectful and focused</li>
+        </ul>
+        <button
+          onClick={() => toast.dismiss(t.id)}
+          className="self-end mt-2 px-4 py-1 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600"
+        >
+          I Understand
+        </button>
+      </div>
+    ), {
+      duration: 10000,
+      position: 'top-center',
+      style: {
+        background: 'white',
+        color: 'black',
+        padding: '16px',
+      },
+    });
+  }, []);
+
   // Start a new chat with a blood requester
   const startNewChat = async (requesterId, requesterName, requestData) => {
     if (!requesterId || !auth.currentUser) {
       toast.error("Missing user information");
       return;
     }
+
+    // Show safety guidelines first
+    showSafetyGuidelines();
 
     try {
       // Check if chat exists already
@@ -338,8 +371,7 @@ const RequestChats = () => {
     };
   }, []);
 
-  // Send message
-  const sendMessage = (e) => {
+  // Send message  const sendMessage = async (e) => {
     e?.preventDefault();
     if (!newMessage.trim() || !selectedChat || !auth.currentUser) return;
 
@@ -354,6 +386,9 @@ const RequestChats = () => {
       const currentUserName = auth.currentUser.displayName || 
                              auth.currentUser.email.split('@')[0] || 
                              'Anonymous';
+                             
+      // Check if notifications are enabled
+      const hasNotificationPermission = await requestNotificationPermission();
 
       // Add message to messages collection
       const newMessageRef = push(ref(database, `messages/${selectedChat}`));

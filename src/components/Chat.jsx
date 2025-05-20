@@ -56,57 +56,70 @@ const Chat = () => {
   }, []);
 
   // --- SOCKET.IO NOTIFICATION SYSTEM ---
+  // Enhanced socket.io notification handling
   useEffect(() => {
     if (!user) return;
+    
     // Join user's room for private messages
     socket.emit("join", user.uid);
 
-    // Listen for incoming messages (real-time chat updates)
+    // Listen for incoming messages
     socket.on("receive-message", (data) => {
       console.log("[Chat.jsx] receive-message event:", data);
-      // If the message is for the current user and not in the active chat, show notification
+      
+      // Show notification if message is not in active chat
       if (
         data.receiverId === user.uid &&
         (!selectedChat || selectedChat.otherUserId !== data.senderId)
       ) {
-        // Toast notification (in-app)
-        toast.success(`New message from ${data.senderName || "User"}`);
-        // Browser notification
+        // In-app toast notification
+        toast.custom((t) => (
+          <div className="flex items-center gap-3 bg-white p-4 rounded-lg shadow-lg">
+            <MessageCircle className="w-6 h-6 text-red-500" />
+            <div className="flex-1">
+              <p className="font-medium">{data.senderName}</p>
+              <p className="text-sm text-gray-600 truncate">{data.text}</p>
+            </div>
+            <button
+              onClick={() => {
+                const chat = chats.find(c => c.otherUserId === data.senderId);
+                if (chat) {
+                  setSelectedChat(chat);
+                }
+                toast.dismiss(t.id);
+              }}
+              className="px-3 py-1 bg-red-500 text-white rounded-md text-sm hover:bg-red-600"
+            >
+              View
+            </button>
+          </div>
+        ), {
+          duration: 5000,
+          position: 'top-right',
+        });
+
+        // Browser notification if enabled
         if (notificationsEnabled) {
-          showNotification(
-            `Message from ${data.senderName || "User"}`,
-            { body: data.text }
-          );
+          showNotification(`Message from ${data.senderName}`, {
+            body: data.text,
+            icon: '/flow4life-logo.png',
+            data: { url: `/chats/${selectedChat?.id}` },
+          });
         }
+
         // Update unread status in chats list
-        setChats((prevChats) =>
-          prevChats.map((chat) =>
+        setChats(prevChats =>
+          prevChats.map(chat =>
             chat.otherUserId === data.senderId
               ? { ...chat, unread: true }
               : chat
           )
         );
       }
-      // Do NOT append the message to the chat UI here; real-time updates come from Firebase listener.
     });
 
-    // Listen for chat notifications
-    socket.on("notification", (data) => {
-      console.log("[Chat.jsx] notification event:", data);
-      console.log("[Socket] notification event:", data);
-      const { title, body, url, receiverId } = data;
-      if (user && receiverId === user.uid) {
-        console.log("[Chat.jsx] Showing browser notification for:", title, body);
-        showNotification(title, {
-          body,
-          icon: '/notification-icon.png',
-          data: { url },
-        });
-      }
-    });
     return () => {
       socket.off("receive-message");
-      socket.off("notification");
     };
   }, [user, selectedChat, chats, notificationsEnabled]);
 
@@ -192,12 +205,45 @@ const Chat = () => {
     });
   };
 
+  // Add safety guidelines function
+  const showSafetyGuidelines = useCallback(() => {
+    toast((t) => (
+      <div className="flex flex-col gap-2 max-w-md">
+        <h3 className="font-bold text-lg mb-1">Chat Safety Guidelines</h3>
+        <ul className="list-disc pl-4 text-sm space-y-1">
+          <li>Meet only in public places or hospitals</li>
+          <li>Verify donor/recipient identity before meeting</li>
+          <li>Share hospital location through the chat</li>
+          <li>Do not share sensitive personal information</li>
+          <li>Report any suspicious behavior</li>
+        </ul>
+        <button
+          onClick={() => toast.dismiss(t.id)}
+          className="self-end mt-2 px-4 py-1 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600"
+        >
+          I Understand
+        </button>
+      </div>
+    ), {
+      duration: 10000,
+      position: 'top-center',
+      style: {
+        background: 'white',
+        color: 'black',
+        padding: '16px',
+      },
+    });
+  }, []);
+
   // Start new chat or select existing
   const startNewChat = async (donorId, donorName) => {
     if (!donorId || !donorName) {
       toast.error("Invalid donor information");
       return;
     }
+
+    // Show safety guidelines first
+    showSafetyGuidelines();
 
     try {
       // Check if chat exists already
@@ -348,55 +394,64 @@ const Chat = () => {
     };
   }, []);
 
-  // Send message with Socket.IO
-  const sendMessage = (e) => {
-    e.preventDefault();
+  // Send message with enhanced notifications
+  const sendMessage = async (e) => {
+    e?.preventDefault();
     if (!newMessage.trim() || !selectedChat) return;
 
-    const messageData = {
-      text: newMessage,
-      senderId: auth.currentUser.uid,
-      receiverId: selectedChat.otherUserId,
-      senderName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
-      timestamp: Date.now()
-    };
+    try {
+      const currentUserName = auth.currentUser.displayName || auth.currentUser.email.split('@')[0];
+      const messageData = {
+        text: newMessage.trim(),
+        senderId: auth.currentUser.uid,
+        receiverId: selectedChat.otherUserId,
+        senderName: currentUserName,
+        timestamp: Date.now()
+      };
 
-    // Save to Firebase
-    const newMessageRef = push(ref(database, `messages/${selectedChat.id}`));
-    set(newMessageRef, {
-      text: newMessage,
-      sender: messageData.senderId,
-      senderName: messageData.senderName,
-      timestamp: messageData.timestamp
-    });
+      // Save to Firebase
+      const newMessageRef = push(ref(database, `messages/${selectedChat.id}`));
+      await set(newMessageRef, {
+        text: messageData.text,
+        sender: messageData.senderId,
+        senderName: messageData.senderName,
+        timestamp: messageData.timestamp
+      });
 
-    const otherUserId = selectedChat.otherUserId;
-    if (!otherUserId) {
-      console.error("Other user ID not found in selected chat:", selectedChat);
-      toast.error("Error sending message. Recipient not found.");
-      return;
+      // Update last message and unread status
+      const updates = {};
+      updates[`userChats/${auth.currentUser.uid}/${selectedChat.id}/lastMessage`] = messageData.text;
+      updates[`userChats/${auth.currentUser.uid}/${selectedChat.id}/timestamp`] = messageData.timestamp;
+      updates[`userChats/${selectedChat.otherUserId}/${selectedChat.id}/lastMessage`] = messageData.text;
+      updates[`userChats/${selectedChat.otherUserId}/${selectedChat.id}/timestamp`] = messageData.timestamp;
+      updates[`userChats/${selectedChat.otherUserId}/${selectedChat.id}/unread`] = true;
+
+      await update(ref(database), updates);
+
+      // Send notification through Firebase
+      await sendChatNotification(
+        selectedChat.otherUserId,
+        messageData.text,
+        messageData.senderName
+      );
+
+      // Also emit via socket for real-time updates
+      socket.emit("send-message", messageData);
+
+      // Show browser notification if enabled
+      if (await requestNotificationPermission()) {
+        showNotification(`New message from ${messageData.senderName}`, {
+          body: messageData.text,
+          icon: '/flow4life-logo.png',
+          data: { url: `/chats/${selectedChat.id}` },
+        });
+      }
+
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error('Failed to send message');
     }
-
-    const updates = {};
-    updates[`userChats/${auth.currentUser.uid}/${selectedChat.id}/lastMessage`] = newMessage;
-    updates[`userChats/${auth.currentUser.uid}/${selectedChat.id}/timestamp`] = messageData.timestamp;
-    updates[`userChats/${otherUserId}/${selectedChat.id}/lastMessage`] = newMessage;
-    updates[`userChats/${otherUserId}/${selectedChat.id}/timestamp`] = messageData.timestamp;
-    updates[`userChats/${otherUserId}/${selectedChat.id}/unread`] = true;
-
-    update(ref(database), updates);
-
-    // Send notification through Firebase for offline users
-    sendChatNotification(
-      otherUserId,
-      newMessage,
-      messageData.senderName
-    );
-
-    // Emit message via socket.io for real-time updates
-    socket.emit("send-message", messageData);
-
-    setNewMessage('');
   };
 
   // Function to request notification permission again if needed
@@ -517,7 +572,8 @@ const Chat = () => {
                 {isTyping && (
                   <p className="text-sm text-gray-500 italic">Typing...</p>
                 )}
-              </div>              {/* Messages */}                <div
+              </div>              {/* Messages */}
+              <div
                 className="flex-1 overflow-y-auto px-3 md:px-6 py-4 space-y-3 bg-gradient-to-b from-gray-50 to-white"
                 ref={chatContainerRef}
               >
@@ -525,7 +581,8 @@ const Chat = () => {
                   <p className="text-gray-500 text-sm italic text-center">No messages yet.</p>
                 ) : (
                   messages.map(msg => (
-                    <div                      key={`message-${msg.id}`}
+                    <div
+                      key={`message-${msg.id}`}
                       className={`${
                         msg.sender === auth.currentUser.uid
                           ? "ml-auto bg-gradient-to-r from-red-500 to-red-600 text-white shadow-md"
@@ -542,7 +599,10 @@ const Chat = () => {
                   ))
                 )}
                 <div ref={messagesEndRef} />
-              </div>              {/* Message input */}              <form onSubmit={sendMessage} className="flex border-t border-gray-200 p-3 md:p-4 space-x-2 md:space-x-3 items-center bg-gradient-to-r from-red-50 to-white">
+              </div>
+
+              {/* Message input */}
+              <form onSubmit={sendMessage} className="flex border-t border-gray-200 p-3 md:p-4 space-x-2 md:space-x-3 items-center bg-gradient-to-r from-red-50 to-white">
                 <input
                   type="text"
                   value={newMessage}
@@ -559,8 +619,8 @@ const Chat = () => {
                   <Send className="w-5 h-5" />
                 </button>
               </form>
-            </>
-          ) : (            <div className="flex flex-col items-center justify-center flex-1 text-red-400 italic bg-gradient-to-b from-red-50 to-white">
+            </>          ) : (
+            <div className="flex flex-col items-center justify-center flex-1 text-red-400 italic bg-gradient-to-b from-red-50 to-white">
               <div className="p-8 rounded-full bg-red-100/50 backdrop-blur-sm">
                 <MessageCircle size={64} className="text-red-500" />
               </div>

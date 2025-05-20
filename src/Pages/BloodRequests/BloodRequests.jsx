@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Fragment } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
 import { getDatabase, ref, onValue, query, orderByChild, push, set, get } from 'firebase/database';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
-import { MessageCircle, MapPin, AlertCircle, Clock } from 'lucide-react';
+import { MessageCircle, MapPin, AlertCircle, Clock, ShieldCheck } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 import { sendChatNotification } from '../../Utils/Notifications';
 
@@ -15,6 +16,8 @@ const BloodRequests = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [pendingChat, setPendingChat] = useState(null);
 
   useEffect(() => {
     // Get user's location
@@ -81,9 +84,7 @@ const BloodRequests = () => {
 
   const deg2rad = (deg) => {
     return deg * (Math.PI / 180);
-  };
-
-  const handleChatClick = async (requesterId, requesterName, request) => {
+  };  const handleChatClick = async (requesterId, requesterName, request) => {
     if (!auth.currentUser) {
       toast.error("Please sign in to chat with requesters");
       navigate('/signin');
@@ -91,6 +92,8 @@ const BloodRequests = () => {
     }
 
     try {
+      // Check if chat already exists
+
       // Check if chat already exists
       const userChatsRef = ref(database, `userChats/${auth.currentUser.uid}`);
       const userChatsSnapshot = await get(userChatsRef);
@@ -498,4 +501,4 @@ const BloodRequests = () => {
   );
 };
 
-export default BloodRequests; 
+export default BloodRequests;
