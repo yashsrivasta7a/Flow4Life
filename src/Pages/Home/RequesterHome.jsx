@@ -145,7 +145,7 @@ const RequesterHome = () => {
               <div className="flex items-center gap-3">
                 <MdEmail className="w-6 h-6 text-blue-600" />
                 <span className="text-gray-700">
-                  Email us at <a href="mailto:flow4life.info@gmail.com" className="text-blue-600 underline">flow4life.info@gmail.com</a>
+                  Email us at <a href="mailto:ircs@indianredcross.org" className="text-blue-600 underline">ircs@indianredcross.org</a>
                 </span>
               </div>
             </div>
