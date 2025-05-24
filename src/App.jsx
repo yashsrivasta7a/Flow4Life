@@ -14,8 +14,6 @@ import UserProfile from './Pages/UserProfile/UserProfile';
 import ProfileSetup from './Pages/ProfileSetup/ProfileSetup';
 import Chat from './components/Chat';
 import NotificationCenter from './components/NotificationCenter';
-// import ChatWithUser from './Pages/ChatWithUser/ChatWithUser';
-// import ChatList from './Pages/ChatList/ChatList';
 import { AnimatePresence } from 'framer-motion';
 import BloodRequests from './Pages/BloodRequests/BloodRequests';
 import RequestChats from './Pages/BloodRequests/RequestChats';
@@ -139,26 +137,9 @@ function AppContent() {
                   </ProtectedRoute>
                 }
               />
-              {/* <Route
-                path="/chat/:userId"
-                element={
-                  <ProtectedRoute>
-                    <ChatWithUser />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/chat-list"
-                element={
-                  <ProtectedRoute>
-                    <ChatList />
-                  </ProtectedRoute>
-                }
-              /> */}
             </Routes>
           </AnimatePresence>
 
-          {/* Floating Chatbot visible globally (except excluded routes) */}
           {shouldShowChatbot && <Chatbot />}
         </div>
       </div>
@@ -166,14 +147,13 @@ function AppContent() {
   );
 }
 
-// App wrapper for Router
 function App() {
  
 
   if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/service-worker.js') // ✅ this must match the file in /public
+      .register('/service-worker.js')
       .then((registration) => {
         console.log('✅ Service Worker registered:', registration);
       })
